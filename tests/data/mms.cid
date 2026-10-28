@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- tests/test_mms.py: one logical device, a float measurand and a boolean status,
+     a data set of both, one URCB and one BRCB on it. -->
+<SCL xmlns="http://www.iec.ch/61850/2003/SCL" version="2007" revision="B">
+  <IED name="IED1" manufacturer="Zelos" type="Test">
+    <AccessPoint name="AP1">
+      <Server>
+        <LDevice inst="LD0">
+          <LN0 lnClass="LLN0" inst="" lnType="LLN0_T">
+            <DataSet name="dsMeas">
+              <FCDA ldInst="LD0" lnClass="MMDC" lnInst="1" doName="Watt" daName="mag.f" fc="MX"/>
+              <FCDA ldInst="LD0" lnClass="GGIO" lnInst="1" doName="Ind1" daName="stVal" fc="ST"/>
+            </DataSet>
+            <ReportControl name="urcbMeas" datSet="dsMeas" buffered="false" confRev="1"/>
+            <ReportControl name="brcbMeas" datSet="dsMeas" buffered="true" confRev="1"/>
+          </LN0>
+          <LN lnClass="MMDC" inst="1" lnType="MMDC_T"/>
+          <LN lnClass="GGIO" inst="1" lnType="GGIO_T"/>
+        </LDevice>
+      </Server>
+    </AccessPoint>
+  </IED>
+  <DataTypeTemplates>
+    <LNodeType id="LLN0_T" lnClass="LLN0">
+      <DO name="Mod" type="ENC_T"/>
+    </LNodeType>
+    <LNodeType id="MMDC_T" lnClass="MMDC">
+      <DO name="Watt" type="MV_T"/>
+    </LNodeType>
+    <LNodeType id="GGIO_T" lnClass="GGIO">
+      <DO name="Ind1" type="SPS_T"/>
+    </LNodeType>
+    <DOType id="ENC_T" cdc="ENC">
+      <DA name="stVal" bType="INT8" fc="ST" dchg="true"/>
+    </DOType>
+    <DOType id="MV_T" cdc="MV">
+      <DA name="mag" bType="Struct" type="AnalogValue_T" fc="MX" dchg="true"/>
+      <DA name="q" bType="Quality" fc="MX" qchg="true"/>
+    </DOType>
+    <DOType id="SPS_T" cdc="SPS">
+      <DA name="stVal" bType="BOOLEAN" fc="ST" dchg="true"/>
+      <DA name="q" bType="Quality" fc="ST" qchg="true"/>
+    </DOType>
+    <DAType id="AnalogValue_T">
+      <BDA name="f" bType="FLOAT32"/>
+    </DAType>
+  </DataTypeTemplates>
+</SCL>

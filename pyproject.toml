@@ -28,6 +28,9 @@ dependencies = [
     # helper are matched to one release. `decode.py` still probes for the GOOSE
     # decoder and refuses with the version it needs.
     "zelos-packet==0.0.7",
+    # Pure-Python MMS client (Apache-2.0, stdlib only). Exact pin: pre-1.0, minor
+    # versions may change the API, and `mms.py` is the only module importing it.
+    "open61850==0.9.15",
 ]
 
 [project.scripts]

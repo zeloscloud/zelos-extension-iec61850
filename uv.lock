@@ -132,6 +132,15 @@ wheels = [
 ]
 
 [[package]]
+name = "open61850"
+version = "0.9.15"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/cb/a2/b84b15ccaadb5de83d78e79249ab0533b6474b2b9e2da41939ade52a4676/open61850-0.9.15.tar.gz", hash = "sha256:d838d46d92a913d718d5866d7648396fd3e8b45dcb35cae8dd87230342ed731a", size = 221580, upload-time = "2026-10-28T17:59:17.312Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/62/8d/ac2cc1901162f23dccf88157065a4d8e6c9cf6d3482a72f97ddb9b84174d/open61850-0.9.15-py3-none-any.whl", hash = "sha256:7cfe14953f810856f45a325178572a486a36892d517556fce0941e85cc4a987d", size = 172256, upload-time = "2026-10-28T17:59:12.129Z" },
+]
+
+[[package]]
 name = "packaging"
 version = "26.3"
 source = { registry = "https://pypi.org/simple" }
@@ -554,6 +563,7 @@ name = "zelos-extension-iec61850"
 version = "0.3.1"
 source = { editable = "." }
 dependencies = [
+    { name = "open61850" },
     { name = "rich-click" },
     { name = "zelos-packet" },
     { name = "zelos-sdk" },
@@ -569,6 +579,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "open61850", specifier = "==0.9.15" },
     { name = "rich-click", specifier = ">=1.8.0" },
     { name = "zelos-packet", specifier = "==0.0.7" },
     { name = "zelos-sdk", specifier = ">=0.0.13" },
