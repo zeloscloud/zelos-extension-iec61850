@@ -50,7 +50,7 @@ class TestAppMode:
         [decoder] = FakeDecoder.instances
         assert decoder.path == str(DEMO_PCAP)
         assert decoder.realtime is True and decoder.flushed
-        assert (decoder.kwargs["name"], decoder.kwargs["source"].name) == ("goose-demo", "GOOSE")
+        assert (decoder.kwargs["name"], decoder.kwargs["source"].name) == ("goose-demo", "IEC61850")
 
     def test_replay_ignores_interfaces_and_takes_replay_scl(self, app_config, tmp_path: Path):
         scl = tmp_path / "station.scd"

@@ -38,10 +38,8 @@ class TestKwargs:
         decoder = make_decoder("eth0.100", "SUB1", namespace=ns, goose=goose)
         assert decoder.kwargs["name"] == "eth0_100"
         assert decoder.kwargs["source"].name == "SUB1"
-        # Control blocks: fixed `GOOSE` source in the SAME namespace, or a
-        # conversion's writer never sees them.
-        assert decoder.kwargs["goose_source"].name == "GOOSE"
-        assert decoder.kwargs["goose_source"].namespace is ns
+        # Control blocks land on the rows' source: nothing else to pass.
+        assert "goose_source" not in decoder.kwargs
         assert goose.kwargs().items() <= decoder.kwargs.items()
 
 

@@ -24,11 +24,11 @@ class TestSchema:
     def test_empty_config_gets_the_defaults(self, tmp_path: Path):
         config = load(tmp_path, {})
         assert config["interfaces"] == []
-        assert config["advanced"] == {"prefix": "GOOSE", "log_level": "INFO"}
+        assert config["advanced"] == {"prefix": "IEC61850", "log_level": "INFO"}
 
     def test_shipped_config_json_validates(self, tmp_path: Path):
         shipped = json.loads((REPO_ROOT / "config.json").read_text())
-        assert load(tmp_path, shipped)["advanced"]["prefix"] == "GOOSE"
+        assert load(tmp_path, shipped)["advanced"]["prefix"] == "IEC61850"
 
     def test_promiscuous_is_not_a_setting(self, tmp_path: Path):
         with pytest.raises(Exception, match="promiscuous"):

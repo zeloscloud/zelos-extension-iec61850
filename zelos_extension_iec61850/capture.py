@@ -6,9 +6,9 @@ the helper holds whatever privilege the open needs, drops it before it reads a
 byte, and streams decoded rows straight to the agent over its own SDK
 connection. Nothing passes through this process.
 
-Per-frame rows land at ``<prefix>/<name>/goose``. Decoded control blocks are
-global to the station bus and always sit under the fixed ``GOOSE`` signal
-source as ``GOOSE/<goID>``, whatever the prefix.
+Per-frame rows land at ``<prefix>/<name>/goose``. Decoded control blocks land
+in the same tree, in the IEC 61850 model: ``<prefix>/<LD>/LLN0/GO/<gcb>``, the
+gocbRef with ``$`` as ``/``.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from . import decode, pkg
-from .constants import BUFFER_SIZE, DEFAULT_PREFIX, GOOSE_BPF, RESERVED_NAMES, SNAPLEN, name_error
+from .constants import BUFFER_SIZE, GOOSE_BPF, RESERVED_NAMES, SNAPLEN, name_error
 from .decode import ConfigError, GooseConfig
 
 logger = logging.getLogger(__name__)
@@ -340,13 +340,11 @@ def make_decoder(
     constructor keywords.
     """
     decode.require()
-    # Control blocks always land on the fixed `GOOSE` source, in the same
-    # namespace as the rows: left to its default, zelos-packet would make one
-    # in the global namespace, which a conversion's writer never sees.
+    # Control blocks land on the rows' source: one tree per prefix, and a
+    # conversion's writer sees them.
     return pkg.module().PacketDecoder(
         name=sanitize_capture_name(name),
         source=make_trace_source(source_name, namespace, cached=cached),
-        goose_source=make_trace_source(DEFAULT_PREFIX, namespace, cached=cached),
         **goose.kwargs(),
     )
 

@@ -62,10 +62,10 @@
         "prefix": {
           "type": "string",
           "title": "Prefix",
-          "description": "Trace source for per-frame rows, '<prefix>/<name>/goose'. Decoded control blocks are global to the station bus and always appear under 'GOOSE/<goID>', whatever the prefix.",
+          "description": "Trace source, one tree for the station: control blocks at '<prefix>/<LD>/LLN0/GO/<gcb>', per-frame rows at '<prefix>/<name>/goose'.",
           "minLength": 1,
-          "default": "GOOSE",
-          "ui:placeholder": "GOOSE"
+          "default": "IEC61850",
+          "ui:placeholder": "IEC61850"
         },
         "replay_pcap": {
           "type": "string",

@@ -3,8 +3,8 @@
 IEC 61850 GOOSE, in your Zelos workspace.
 
 - 📡 **Subscribe to a segment**: pick a network interface; every control block publishing on it appears, nothing to connect to
-- 🧩 **One event per control block**: `GOOSE/<goID>` with the header (`stNum`, `sqNum`, `t`, `timeAllowedtoLive`, `simulation`, `confRev`, ...) and every dataset member as a typed field
-- 📄 **Named by SCL**: add the station's `.scd`/`.cid` and members read `ldInst/lnName.doName.daName`; without it they are `d00`, `d01`, ...
+- 🧩 **One event per control block**: `IEC61850/<LD>/LLN0/GO/<gcb>`, the gocbRef as a path, with the header (`stNum`, `sqNum`, `t`, `timeAllowedtoLive`, `simulation`, `confRev`, ...) and every dataset member as a typed field
+- 📄 **Named by SCL**: add the station's `.scd`/`.cid` and members read `lnName_doName_daName`; without it they are `d00`, `d01`, ...
 - 🩺 **Health per control block**: per-frame `stnum_gap`, `sqnum_gap`, `tal_expired` flags, so a lost or late publisher shows up as a signal
 - 📁 **Open a pcap**: decode `.pcap`/`.pcapng`, plain or gzip/zstd compressed, with no privileges and no NIC
 - 🎛️ **Demo**: a bundled one-minute capture, for trying it without a substation
@@ -38,7 +38,7 @@ Decoding a file instead plays it once at the capture's pace, then the extension 
 zelos extensions start zeloscloud.zelos-extension-iec61850 --config '{"advanced": {"replay_pcap": "station.pcapng", "replay_scl": "station.scd"}}'
 ```
 
-Per-frame rows are under **prefix (default GOOSE) → your interface → goose**.
+Per-frame rows are under **prefix (default IEC61850) → your interface → goose**.
 
 ## Granting capture rights
 
@@ -71,7 +71,7 @@ keeps everything else on the station bus (Sampled Values, IP) out of the trace.
 
 | Event | One row per | Fields |
 | --- | --- | --- |
-| `GOOSE/<goID>` | GOOSE message of that control block | the IEC 61850-8-1 header, named as on the wire: `appid`, `length`, `reserved1`, `reserved2`, `s_bit`, `gocbRef`, `timeAllowedtoLive`, `datSet`, `goID`, `t`, `t_quality`, `stNum`, `sqNum`, `simulation`, `confRev`, `ndsCom`, `numDatSetEntries`; then `src_mac`, `vlan_id`; then one field per dataset member (SCL name, else `d00`, `d01`, ... with the ASN.1 type in the description); then `stnum_gap`, `sqnum_gap`, `tal_expired` |
+| `<prefix>/<LD>/LLN0/GO/<gcb>` | GOOSE message of that control block (`FULLLD0/LLN0$GO$dcdc` → `IEC61850/FULLLD0/LLN0/GO/dcdc`) | the IEC 61850-8-1 header, named as on the wire: `appid`, `length`, `reserved1`, `reserved2`, `s_bit`, `gocbRef`, `timeAllowedtoLive`, `datSet`, `goID`, `t`, `t_quality`, `stNum`, `sqNum`, `simulation`, `confRev`, `ndsCom`, `numDatSetEntries`; then `src_mac`, `vlan_id`; then one field per dataset member (SCL name, else `d00`, `d01`, ... with the ASN.1 type in the description); then `stnum_gap`, `sqnum_gap`, `tal_expired` |
 | `<prefix>/<name>/goose` | GOOSE frame on that interface | `frame_no`, `iface`, the header above, `src_mac`, `dst_mac`, `vlan_id`, `vlan_pcp`, `malformed` |
 | `<prefix>/<name>/packets`, `stats` | captured frame, capture tick | as the Packet extension |
 
@@ -87,7 +87,7 @@ keeps everything else on the station bus (Sampled Values, IP) out of the trace.
 | `interfaces[].interface` | – | NIC to subscribe on |
 | `interfaces[].name` | interface name | Names this interface's branch in the tree |
 | `interfaces[].scl` | – | SCD/CID file to name and type dataset members by |
-| `advanced.prefix` | `GOOSE` | Trace source for per-frame rows, `<prefix>/<name>/goose`. Control blocks always sit under `GOOSE/<goID>`, whatever the prefix |
+| `advanced.prefix` | `IEC61850` | Trace source, one tree for the station: control blocks at `<prefix>/<LD>/LLN0/GO/<gcb>`, per-frame rows at `<prefix>/<name>/goose` |
 | `advanced.replay_pcap` | – | Decode this `.pcap`/`.pcapng` (plain or `.gz`/`.zst`) instead of capturing; plays once, then exits. `interfaces` is ignored |
 | `advanced.replay_scl` | – | SCD/CID file for the replayed capture's publishers |
 | `advanced.log_level` | `INFO` | |
