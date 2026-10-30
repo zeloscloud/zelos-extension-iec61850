@@ -64,7 +64,7 @@ _prefix_option = click.option(
     default=DEFAULT_PREFIX,
     show_default=True,
     callback=_prefix,
-    help="Trace source for per-frame rows. Control blocks are always under GOOSE.",
+    help="Trace source: <prefix>/<LD>/LLN0/GO/<gcb> control blocks, <prefix>/<name>/goose rows.",
 )
 
 
