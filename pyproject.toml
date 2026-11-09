@@ -39,13 +39,13 @@ zelos-extension-iec61850 = "main:cli"
 Homepage = "https://github.com/zeloscloud/zelos-extension-iec61850"
 Repository = "https://github.com/zeloscloud/zelos-extension-iec61850"
 Issues = "https://github.com/zeloscloud/zelos-extension-iec61850/issues"
-Documentation = "https://docs.zeloscloud.io/extensions"
+Documentation = "https://docs.zeloscloud.io/app/extensions/"
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
-    "pytest>=8.4.2",
-    "pre-commit>=4.3.0",
-    "ruff>=0.14.2",
+    "pytest>=9.1.1",
+    "pre-commit>=4.6.2",
+    "ruff>=0.16.10",
     "jsonschema>=4.0.0",
 ]
 
