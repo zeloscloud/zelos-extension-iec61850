@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 from zelos_sdk.actions import ActionsRegistry
 
 from zelos_extension_iec61850 import actions
@@ -84,3 +86,21 @@ def test_check_permissions_without_the_package_still_carries_remediation(monkeyp
     result = actions.check_permissions()
     assert result["status"] == "error"
     assert "Replay PCAP File" in result["remediation"]
+
+
+def test_a_windows_description_reaches_the_picker_and_the_cli(fake_packet):
+    from click.testing import CliRunner
+
+    import main
+
+    npf = r"\Device\NPF_{4B1C}"
+    fake_packet.list_interfaces = lambda: [
+        SimpleNamespace(
+            name=npf, is_up=True, is_loopback=False, addresses=[], description="Ethernet 5 (I225-V)"
+        )
+    ]
+    assert actions.list_interfaces()["choices"] == [
+        {"value": npf, "label": "Ethernet 5 (I225-V)", "detail": "up"}
+    ]
+    output = CliRunner().invoke(main.cli, ["interfaces"]).output
+    assert output.startswith(npf) and output.rstrip().endswith("Ethernet 5 (I225-V)")

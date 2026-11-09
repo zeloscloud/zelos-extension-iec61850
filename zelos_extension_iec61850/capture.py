@@ -143,12 +143,17 @@ at login. Check the grant with:
 
     {executable} -m zelos_packet status
 """
-    else:
-        # Platform support is zelos-packet's call (`capture_supported()`); when a
-        # Windows backend ships there, this branch and the README line go away.
+    elif system == "Windows":
         body = f"""
-The installed zelos-packet has no live capture backend for {system!r}; today it
-captures on Linux (AF_PACKET) and macOS (/dev/bpf).
+Live capture needs Npcap (free, https://npcap.com), installed with the default
+options; 1.82 or newer keeps VLAN tags. Check it with:
+
+    {executable} -m zelos_packet status
+"""
+    else:
+        body = f"""
+zelos-packet has no live capture backend for {system!r}; it captures on Linux,
+macOS and Windows.
 """
     return f"{body.strip()}\n\n{_REPLAY_HINT}"
 
@@ -305,6 +310,8 @@ def list_interfaces() -> list[dict[str, Any]]:
             "is_up": getattr(iface, "is_up", None),
             "is_loopback": getattr(iface, "is_loopback", None),
             "addresses": list(getattr(iface, "addresses", []) or []),
+            # Windows: "Ethernet 5 (Intel(R) ...)" for a `\Device\NPF_{GUID}` name.
+            "description": getattr(iface, "description", None),
         }
         for iface in pkg.module().list_interfaces()
     ]
@@ -367,7 +374,9 @@ def probe_permissions(interface: str | None = None) -> dict[str, Any]:
     """Report whether live capture would work, from `zelos_packet status`,
     without opening a handle. Every failure carries remediation."""
     system = platform.system()
-    supported = pkg.capture_supported() if pkg.available() else system in ("Linux", "Darwin")
+    supported = (
+        pkg.capture_supported() if pkg.available() else system in ("Linux", "Darwin", "Windows")
+    )
 
     def denied(reason: str, target: str | None = None, remediation: str | None = None) -> dict:
         return {

@@ -1,49 +1,41 @@
-# Zelos IEC 61850 Extension Manifest
-# See https://docs.zeloscloud.io/sdk/how-to/develop-extensions/ for full documentation
-
 name = "IEC 61850"
 version = "0.2.1"
 description = "IEC 61850 station bus: a GOOSE subscriber for every control block on a segment, decoded live or from a pcap"
 author = "Zelos"
 repository = "https://github.com/zeloscloud/zelos-extension-iec61850"
 homepage = "https://github.com/zeloscloud/zelos-extension-iec61850"
+# At most 20 keywords and 10 categories. Marketplace search matches both, the name, description,
+# author and repository. Zelos AI sees the name, description and keywords, not the categories.
 keywords = ["goose", "iec61850", "iec 61850", "substation", "scl", "scd", "protection", "pcap", "ethernet"]
 categories = ["Industrial", "Networking", "IoT"]
-
-# File references (relative paths in archive)
 icon = "assets/icon.png"
 readme = "README.md"
 
-# Compatibility floor: 26.0.8 is the first release whose RJSF form drops a
-# `ui:widget` it does not register instead of throwing. This config names
-# `action-choices`, which older releases crash the whole config dialog on.
 [zelos]
-version = ">=26.0.8"
+version = ">=26.0.10"
 
-# Configuration schema (enables UI in Zelos App)
 [config]
 schema = "config.schema.json"
 
-# Runtime configuration
-[runtime]
-type = "python"
+[agent]
+runtime = "python"
 entry = "main.py"
 python_version = "3.11"
+# The platforms zelos-packet ships a wheel for.
+targets = ["linux-x86_64", "linux-aarch64", "darwin-arm64", "windows-x86_64"]
 
 # Stopping tears down every capture handle and lets the SDK's atexit hook drain
 # the trace pipeline; 15s leaves room for a busy interface's final flush before
 # the supervisor escalates to SIGKILL.
-[stop]
+[agent.stop]
 grace_seconds = 15
 
-# Package boundary for `zelos extensions package`. extension.toml, README.md,
-# config.schema.json, assets/icon.png, pyproject.toml, uv.lock and the generated
-# actions.json are added automatically; everything else has to be named here.
 # `config.json` ships so a fresh install has sane defaults before the app writes
 # its own. The demo capture is inside the package directory already; naming it
 # makes the packaging test fail if it goes missing.
 [package]
 paths = [
+    "LICENSE",
     "main.py",
     "zelos_extension_iec61850",
     "zelos_extension_iec61850/demo/goose-demo.pcap",

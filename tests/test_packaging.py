@@ -30,7 +30,7 @@ def test_config_schema_exists() -> None:
 
 
 def test_entry_point_is_packaged() -> None:
-    assert MANIFEST["runtime"]["entry"] in MANIFEST["package"]["paths"]
+    assert MANIFEST["agent"]["entry"] in MANIFEST["package"]["paths"]
 
 
 def test_entry_module_re_exports_the_action_prefix() -> None:

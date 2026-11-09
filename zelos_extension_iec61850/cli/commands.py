@@ -94,7 +94,8 @@ def interfaces_cmd() -> None:
     for iface in _list_interfaces():
         flags = [f for f, on in (("up", iface["is_up"]), ("loopback", iface["is_loopback"])) if on]
         addresses = ", ".join(str(a) for a in iface["addresses"]) or "-"
-        click.echo(f"{iface['name']:<16} {'/'.join(flags) or '-':<14} {addresses}")
+        line = f"{iface['name']:<16} {'/'.join(flags) or '-':<14} {addresses}"
+        click.echo(f"{line}  {iface['description']}" if iface.get("description") else line)
 
 
 @click.command("check")

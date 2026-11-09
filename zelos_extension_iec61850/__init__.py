@@ -1,9 +1,10 @@
 """Zelos GOOSE extension.
 
-IEC 61850 GOOSE subscriber: live capture (Linux AF_PACKET, macOS /dev/bpf) and
+IEC 61850 GOOSE subscriber: live capture (Linux AF_PACKET, macOS /dev/bpf, Windows Npcap) and
 pcap replay, decoded by the Rust-cored `zelos-packet` package.
 """
 
+from . import _agent_env  # noqa: F401  (first: sets the environment before anything reads it)
 from .capture import (
     CaptureDeniedError,
     CaptureSession,

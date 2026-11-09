@@ -72,7 +72,11 @@ def _interface_choice(iface: dict[str, Any]) -> dict[str, str]:
     addresses = iface.get("addresses") or []
     if addresses and isinstance(addresses[0], str):
         detail.append(addresses[0])
-    return {"value": iface["name"], "detail": " · ".join(detail)}
+    choice = {"value": iface["name"], "detail": " · ".join(detail)}
+    # Windows: "Ethernet 5 (Intel(R) ...)" reads better than \Device\NPF_{GUID}.
+    if iface.get("description"):
+        choice["label"] = iface["description"]
+    return choice
 
 
 def _interface_rank(iface: dict[str, Any]) -> tuple[int, str]:

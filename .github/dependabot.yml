@@ -1,6 +1,6 @@
 version: 2
 updates:
-  # Python dependencies (pyproject.toml and uv.lock)
+  # Agent runtime: pyproject.toml and uv.lock
   - package-ecosystem: "uv"
     directory: "/"
     schedule:
