@@ -100,7 +100,7 @@ def test_a_windows_description_reaches_the_picker_and_the_cli(fake_packet):
         )
     ]
     assert actions.list_interfaces()["choices"] == [
-        {"value": npf, "detail": "Ethernet 5 (I225-V) · up"}
+        {"value": npf, "label": "Ethernet 5 (I225-V)", "detail": "up"}
     ]
     output = CliRunner().invoke(main.cli, ["interfaces"]).output
     assert output.startswith(npf) and output.rstrip().endswith("Ethernet 5 (I225-V)")
