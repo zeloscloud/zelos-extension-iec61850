@@ -130,7 +130,10 @@ def run_sessions(configs: list[InterfaceConfig], prefix: str) -> None:
         logger.info(
             "Subscribed on %d interface%s; waiting for stop", len(started), "s"[: len(started) != 1]
         )
-        stop_event.wait()
+        # Polled: on Windows a bare wait() is not interrupted by Ctrl+C, the
+        # agent's stop signal, so the handler would never run.
+        while not stop_event.wait(0.5):
+            pass
     finally:
         for session in reversed(started):
             session.stop()
