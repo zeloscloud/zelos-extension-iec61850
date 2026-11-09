@@ -64,7 +64,7 @@ def _sessions(name: str) -> tuple[list[CaptureSession], dict[str, Any] | None]:
 
 
 def _interface_choice(iface: dict[str, Any]) -> dict[str, str]:
-    detail = []
+    detail = [iface["description"]] if iface.get("description") else []
     if isinstance(iface.get("is_up"), bool):
         detail.append("up" if iface["is_up"] else "down")
     if iface.get("is_loopback") is True:

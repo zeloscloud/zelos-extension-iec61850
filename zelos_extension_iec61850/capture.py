@@ -305,6 +305,8 @@ def list_interfaces() -> list[dict[str, Any]]:
             "is_up": getattr(iface, "is_up", None),
             "is_loopback": getattr(iface, "is_loopback", None),
             "addresses": list(getattr(iface, "addresses", []) or []),
+            # Windows: "Ethernet 5 (Intel(R) ...)" for a `\Device\NPF_{GUID}` name.
+            "description": getattr(iface, "description", None),
         }
         for iface in pkg.module().list_interfaces()
     ]
