@@ -17,19 +17,17 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-    # 0.0.13a1 has `hidden=` actions (older SDKs swallow the keyword and still
-    # list the action) and the evt_flush ABI slot the capture path needs. The
-    # prerelease marker has to appear HERE, on a direct dependency: uv enables
-    # prereleases per package only when a direct requirement names one.
-    "zelos-sdk>=0.0.13a1",
+    # 0.0.13 has `hidden=` actions (older SDKs swallow the keyword and still
+    # list the action) and the evt_flush ABI slot the capture path needs.
+    "zelos-sdk>=0.0.13",
     "rich-click>=1.8.0",
-    # Rust-cored capture + decode. Live capture is Linux (AF_PACKET) and macOS
-    # (/dev/bpf) only; the decode path is portable, so no sys_platform marker.
+    # Rust-cored capture + decode: Linux (AF_PACKET), macOS (/dev/bpf) and
+    # Windows (Npcap).
     #
     # Exact pin, as the Packet extension: the decoder surface and the privileged
     # helper are matched to one release. `decode.py` still probes for the GOOSE
     # decoder and refuses with the version it needs.
-    "zelos-packet==0.0.5",
+    "zelos-packet==0.0.6",
 ]
 
 [project.scripts]
