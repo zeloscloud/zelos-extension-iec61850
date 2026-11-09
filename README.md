@@ -52,7 +52,7 @@ sudo /path/to/python -m zelos_packet install-helper
 - 🔐 **Linux** installs a small privileged helper (`cap_net_raw` only) and a `zelos-packet` group; **macOS** installs a boot-time daemon that puts `/dev/bpf*` in the `access_bpf` group
 - 🔁 Log out and back in, then restart the agent: a session's groups are fixed at login
 - ✅ `python -m zelos_packet status` says whether capture would work right now
-- 🪟 Windows: live capture arrives with zelos-packet's Windows backend; until then use `advanced.replay_pcap`
+- 🪟 **Windows** needs [Npcap](https://npcap.com) instead (free, default options; 1.82 or newer keeps VLAN tags). On Intel I225-V/I226 NICs set **Packet Priority & VLAN** to **Disabled**, or tagged GOOSE loses its tag. The tree names an interface by its connection name (`Ethernet 5` -> `Ethernet_5`)
 
 ## Try it without hardware
 

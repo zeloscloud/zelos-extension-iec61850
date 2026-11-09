@@ -1,6 +1,6 @@
 """Zelos GOOSE extension.
 
-IEC 61850 GOOSE subscriber: live capture (Linux AF_PACKET, macOS /dev/bpf) and
+IEC 61850 GOOSE subscriber: live capture (Linux AF_PACKET, macOS /dev/bpf, Windows Npcap) and
 pcap replay, decoded by the Rust-cored `zelos-packet` package.
 """
 

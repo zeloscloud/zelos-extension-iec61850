@@ -65,7 +65,7 @@ def module() -> Any:
 
 
 def capture_supported() -> bool:
-    """Whether live capture has a native backend here (Linux/macOS)."""
+    """Whether live capture has a native backend here (Linux/macOS/Windows)."""
     return bool(module().capture_supported()) if available() else False
 
 
