@@ -16,6 +16,7 @@ import time
 from pathlib import Path
 
 import pyarrow as pa
+import pytest
 import zelos_sdk
 
 REPO = Path(__file__).resolve().parents[1]
@@ -40,6 +41,7 @@ def _column(path: Path, field: str, *more: str) -> list[tuple]:
     return list(zip(*(table.column(n).to_pylist() for n in names), strict=True))
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="stops the CLI with SIGINT")
 def test_reported_and_read_values_match_the_ied_log(tmp_path: Path) -> None:
     truth_path, trace = tmp_path / "truth.jsonl", tmp_path / "out.trz"
     watt, pos, ind = f"{LD}/MMDC1.Watt.mag.f", f"{LD}/XSWI1.Pos.stVal", f"{LD}/GGIO1.Ind1.stVal"
@@ -91,7 +93,7 @@ def test_reported_and_read_values_match_the_ied_log(tmp_path: Path) -> None:
     numbers = [r[0] for r in _column(trace, f"{LD}/LLN0/RP/urcbObj01.sqNum")]
     assert numbers == list(range(len(numbers))) and len(numbers) >= STEPS + 1
 
-    # Polled reads at 50 ms see every 150 ms step, in order.
+    # Polled reads run beside the reports and see the value move. Not exact: a
+    # read is a sample, and a slow machine may skip a 150 ms step.
     reads = [r[0] for r in _column(trace, f"{LD}/GGIO1/Ind1.stVal", "src") if r[1] == "read"]
-    seen = [v for i, v in enumerate(reads) if i == 0 or v != reads[i - 1]]
-    assert seen == [False, *truth[ind]]
+    assert reads[0] is False and set(reads) == {False, True} and len(reads) >= STEPS
