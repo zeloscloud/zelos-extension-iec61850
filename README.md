@@ -11,7 +11,7 @@ IEC 61850 GOOSE and MMS, in your Zelos workspace.
 - 🎛️ **Demo**: a bundled one-minute capture, for trying it without a substation
 - ⏱️ **One timeline**: trips line up with your Sampled Values, Modbus and sensor data
 
-Read-only by design: this extension never publishes a GOOSE message, and over MMS it writes nothing but the reservation of the report control blocks you name.
+Read-only by design: this extension never publishes a GOOSE message, and over MMS it writes only to the report control blocks you name: their reservation, trigger and report options, integrity period and enable. No data, setting or control is ever written.
 
 ## Quick start
 

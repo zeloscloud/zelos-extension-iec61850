@@ -5,8 +5,8 @@ reference a module-level callable), a shared registry populated by ``cli/app.py`
 at startup, and one global namespace rather than per-interface action paths.
 
 Every action is read-only. GOOSE is subscribe-only here: nothing is ever
-published onto the bus. MMS is read-only too: the only writes are the
-reservation of the report control blocks the configuration names.
+published onto the bus. MMS is read-only too: the only writes are to the
+report control blocks the configuration names (reservation, options, enable).
 """
 
 from __future__ import annotations

@@ -52,7 +52,7 @@
     "servers": {
       "type": "array",
       "title": "MMS Servers",
-      "description": "IEDs to read over MMS (TCP). Read-only: values arrive through the report control blocks named here and through polled reads; nothing is written to the IED beyond reserving those blocks. The 'Browse Server' action lists a server's blocks and data sets.",
+      "description": "IEDs to read over MMS (TCP). Read-only: values arrive through the report control blocks named here and through polled reads; the only writes are to those blocks (reservation, trigger and report options, integrity period, enable). The 'Browse Server' action lists a server's blocks and data sets.",
       "items": {
         "title": "Server",
         "type": "object",
