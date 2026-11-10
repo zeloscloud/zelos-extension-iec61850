@@ -1,5 +1,6 @@
 {
   "interfaces": [],
+  "servers": [],
   "advanced": {
     "prefix": "IEC61850",
     "log_level": "INFO"

@@ -45,6 +45,7 @@ from open61850.mms import MmsError as _LibError
 from open61850.mms import Report as _LibReport
 from open61850.mms import discover as _discover
 from open61850.mms import rcb as _rcb
+from open61850.mms.types import ArrayType, MmsType, PrimitiveType, StructureType
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +77,21 @@ _T = TypeVar("_T")
 
 #: ``(reference, fc)``: ``("IED1LD0/MMXU1.TotW.mag.f", "MX")``.
 Ref = tuple[str, str]
+#: ``(leaf reference, value)`` pairs of one member, in the member's leaf order.
+Values = tuple[tuple[str, Any], ...]
+
+# MMS primitive -> leaf kind; a float's width and a bit-string's length refine it.
+_KINDS = {
+    "boolean": "bool",
+    "integer": "int",
+    "unsigned": "uint",
+    "bcd": "uint",
+    "octet-string": "bytes",
+    "visible-string": "str",
+    "mms-string": "str",
+    "utc-time": "time",
+    "binary-time": "time",
+}
 
 
 class MmsError(RuntimeError):
@@ -118,6 +134,21 @@ class ServerConfig:
 
 
 @dataclass(frozen=True)
+class Member:
+    """A data set member or a read target with its leaves, typed by the server.
+
+    A leaf is ``(reference, kind)``: the member's own reference when it is a
+    data attribute, ``<member>.<component>...`` (array elements by index) when
+    it is a structure. Kinds: bool, int, uint, float32, float64, bits (a
+    bit-string of up to 32 bits, as its integer), bytes, str, time (ns).
+    """
+
+    reference: str
+    fc: str
+    leaves: tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True)
 class ReportEntry:
     """One data set member in a report."""
 
@@ -126,6 +157,7 @@ class ReportEntry:
     value: Any  # plain Python; None when the server sent an access error
     reasons: tuple[str, ...]  # ReasonCode fields set: data_change, integrity, ...
     error: str | None = None
+    values: Values = ()  # the member's leaves; empty on an access error
 
 
 @dataclass(frozen=True)
@@ -134,6 +166,7 @@ class Report:
 
     rcb: str  # LD/LLN0$BR$name
     rpt_id: str
+    rx_ns: int  # when it arrived, ns since the epoch
     seq_num: int | None
     time_ns: int | None  # TimeOfEntry
     data_set: str | None
@@ -148,23 +181,28 @@ class _Block:
     """An enabled RCB and its data set, for naming report entries."""
 
     name: ObjectName
-    members: tuple[Ref, ...]
+    members: tuple[Member, ...]
+    types: tuple[MmsType, ...]
 
     @property
     def text(self) -> str:
         return f"{self.name.domain}/{self.name.item}"
 
-    def convert(self, report: _LibReport) -> Report:
+    def convert(self, report: _LibReport, rx_ns: int) -> Report:
         entries = []
         for e in report.entries:
-            # Without OptFlds data-reference the inclusion index is the data set position.
-            reference, fc = _ref(_parse(e.reference)) if e.reference else self.members[e.index]
+            # OptFlds data-reference is off: the inclusion index is the data set position.
+            member = self.members[e.index]
             error = str(e.value) if isinstance(e.value, DataAccessError) else None
             value = None if error else _plain(e.value)
-            entries.append(ReportEntry(reference, fc, value, _reasons(e.reason), error))
+            values = () if error else _values(member, self.types[e.index], e.value)
+            entries.append(
+                ReportEntry(member.reference, member.fc, value, _reasons(e.reason), error, values)
+            )
         return Report(
             rcb=self.text,
             rpt_id=report.rpt_id,
+            rx_ns=rx_ns,
             seq_num=report.seq_num,
             time_ns=_ns(report.time_of_entry) if report.time_of_entry else None,
             data_set=report.data_set,
@@ -186,6 +224,7 @@ class Session:
         # By RptID. The receive thread reads it, so a block goes in before it is enabled.
         self._blocks: dict[str, _Block] = {}
         self._queue: queue.Queue[Report] = queue.Queue()
+        self._types: dict[Ref, tuple[Member, MmsType]] = {}
 
     def __enter__(self) -> Session:
         self.connect()
@@ -226,6 +265,25 @@ class Session:
         reference = self._resolve(ref)
         data = self._call(f"reading {ref}", lambda c: c.read(reference))
         return _plain(data), reference.fc or ""
+
+    def member(self, ref: str) -> Member:
+        """`ref` with its leaves, from the server's type for it (one request, kept)."""
+        return self._typed(_ref(self._resolve(ref)))[0]
+
+    def read_values(self, ref: str) -> tuple[Member, Values]:
+        """One read of `ref`, a data object or attribute, as its leaves."""
+        member, mms_type = self._typed(_ref(self._resolve(ref)))
+        name = f"{member.reference}[{member.fc}]"
+        data = self._call(f"reading {ref}", lambda c: c.read(name))
+        try:
+            return member, _values(member, mms_type, data)
+        except ValueError as exc:
+            raise MmsError(f"{self._where}: {ref} does not match its type: {exc}.") from None
+
+    @property
+    def blocks(self) -> dict[str, tuple[Member, ...]]:
+        """Every enabled block's data set members, by the block's MMS reference."""
+        return {b.text: b.members for b in self._blocks.values()}
 
     def dataset_members(self, ref: str) -> list[Ref]:
         """A data set's members in order; `ref` is ``LD/LLN0.name`` or ``LD/LLN0$name``."""
@@ -306,14 +364,15 @@ class Session:
             )
         if not status.dat_set:
             raise MmsError(f"{self._where}: {text} has no data set (DatSet is empty).")
-        members = tuple(self.dataset_members(status.dat_set))
+        typed = [self._typed(m) for m in self.dataset_members(status.dat_set)]
+        members = tuple(m for m, _ in typed)
         rpt_id = status.rpt_id or text  # 8-1: an empty RptID reports as the block's reference
         if (other := self._blocks.get(rpt_id)) is not None:
             raise MmsError(
                 f"{self._where}: {text} and {other.text} share RptID {rpt_id!r}, so their "
                 "reports cannot be told apart. Enable one of them."
             )
-        self._blocks[rpt_id] = _Block(block_name, members)
+        self._blocks[rpt_id] = _Block(block_name, members, tuple(t for _, t in typed))
         settings = _rcb.RcbSettings(
             trg_ops=TRG_OPS, opt_flds=OPT_FLDS, intg_pd_ms=round(integrity_period * 1000)
         )
@@ -327,6 +386,15 @@ class Session:
             "%s: enabled %s (RptID %s, %d members)", self._where, text, rpt_id, len(members)
         )
         return text
+
+    def _typed(self, ref: Ref) -> tuple[Member, MmsType]:
+        if ref not in self._types:
+            reference, fc = ref
+            name = f"{reference}[{fc}]"
+            mms_type = self._call(f"reading the type of {name}", lambda c: c.get_type(name))
+            leaves = tuple((".".join((reference, *path)), kind) for path, kind in _leaves(mms_type))
+            self._types[ref] = Member(reference, fc, leaves), mms_type
+        return self._types[ref]
 
     def _resolve(self, ref: str) -> Reference:
         """`ref` with its FC, looked up in the model when it has none."""
@@ -356,7 +424,7 @@ class Session:
             if block is None:
                 logger.debug("%s: report for unknown RptID %r", self._where, report.rpt_id)
                 return
-            self._queue.put(block.convert(report))
+            self._queue.put(block.convert(report, time.time_ns()))
         except Exception:
             logger.exception("%s: dropped a report that does not decode", self._where)
 
@@ -364,7 +432,7 @@ class Session:
         """The next report, or None after `timeout`. Raises MmsError once the
         connection has ended and every report it carried has been taken."""
         try:
-            return self._queue.get(timeout=timeout)
+            return self._queue.get(timeout=timeout) if timeout > 0 else self._queue.get_nowait()
         except queue.Empty:
             pass
         client = self._client
@@ -442,9 +510,17 @@ def run_with_reconnect(
     *,
     timeout: float = DEFAULT_TIMEOUT_S,
     heartbeat: float = HEARTBEAT_S,
+    on_connect: Callable[[Session], None] | None = None,
+    on_read: Callable[[Member, Values, int], None] | None = None,
+    on_lost: Callable[[MmsError], None] | None = None,
 ) -> None:
     """Connect, enable ``config.reports`` and call `on_report` with each report,
     on this thread, until `stop_event` is set.
+
+    `on_connect` runs once the blocks are enabled, before any report is
+    delivered. ``config.reads`` are then read every interval, the first at
+    once, each going to `on_read` with its receive time. `on_lost` hears the
+    error behind every reconnect.
 
     A lost connection (closed, a request timing out, or a block the `heartbeat`
     read-back finds disabled) is retried after the next `backoff` delay, the
@@ -459,13 +535,27 @@ def run_with_reconnect(
         try:
             session.connect()
             session.enable_reports(config.reports, integrity_period=config.integrity_period)
+            polls = [[0.0, ref, interval] for ref, interval in config.reads]
+            for _, ref, _ in polls:
+                session.member(ref)  # a bad reference fails before anything is emitted
+            if on_connect is not None:
+                on_connect(session)
             attempt = 0
             due = time.monotonic() + heartbeat
             while not stop_event.is_set():
-                report = session._next(POLL_S)
+                # Wake for the next read due: a read interval may be shorter than POLL_S.
+                wait = min([POLL_S, *(p[0] - time.monotonic() for p in polls)])
+                report = session._next(max(wait, 0.0))
                 if report is not None:
                     on_report(report)
-                if time.monotonic() >= due:
+                now = time.monotonic()
+                for poll in polls:
+                    if now >= poll[0]:
+                        member, values = session.read_values(poll[1])
+                        if on_read is not None:
+                            on_read(member, values, time.time_ns())
+                        poll[0] = now + poll[2]
+                if now >= due:
                     session._check()
                     due = time.monotonic() + heartbeat
         except MmsError as exc:
@@ -476,10 +566,43 @@ def run_with_reconnect(
             session.close()
         if error is None:
             return
+        if on_lost is not None:
+            on_lost(error)
         delay = backoff[min(attempt, len(backoff) - 1)]
         attempt += 1
         logger.warning("%s Reconnecting in %gs.", error, delay)
         stop_event.wait(delay)
+
+
+def browse(host: str, port: int = DEFAULT_PORT, *, timeout: float = DEFAULT_TIMEOUT_S) -> dict:
+    """What a server offers, read over one short association: each logical
+    device's data sets (with their member count) and report control blocks
+    (data set, whether enabled, who holds it). Nothing is written."""
+    out: dict[str, dict[str, list]] = {}
+    with Session(ServerConfig(host, port), timeout=timeout) as session:
+        model = session._call("discovering the data model", _discover)
+        for node in model.logical_nodes():
+            device = out.setdefault(node.ld, {"data_sets": [], "report_blocks": []})
+            for name in node.data_sets:
+                ref = f"{node.ld}/{node.name}${name}"
+                device["data_sets"].append(
+                    {"ref": ref, "members": len(session.dataset_members(ref))}
+                )
+            for block in (*node.control_blocks("BR"), *node.control_blocks("RP")):
+                status = session._call(
+                    f"reading {block.name}", lambda c, b=block: _rcb.read_status(c, b.object_name)
+                )
+                device["report_blocks"].append(
+                    {
+                        "ref": f"{block.ld}/{block.object_name.item}",
+                        "buffered": block.fc == "BR",
+                        "data_set": status.dat_set or "",
+                        "enabled": bool(status.rpt_ena),
+                        "free": status.free,
+                        "state": status.describe(),
+                    }
+                )
+    return out
 
 
 def _rcb_names(ref: str) -> list[ObjectName]:
@@ -515,6 +638,56 @@ def _reasons(reason: ReasonCode | None) -> tuple[str, ...]:
 
 def _ns(t: datetime) -> int:
     return (t - _EPOCH) // timedelta(microseconds=1) * 1000
+
+
+def _kind(mms_type: PrimitiveType) -> str:
+    size = mms_type.size
+    if mms_type.kind == "float":
+        return "float64" if size == 64 else "float32"
+    if mms_type.kind == "bit-string":
+        return "bits" if size is not None and abs(size) <= 32 else "bytes"
+    return _KINDS.get(mms_type.kind, "str")
+
+
+def _leaves(mms_type: MmsType, path: tuple[str, ...] = ()) -> list[tuple[tuple[str, ...], str]]:
+    """Every primitive below `mms_type` as ``(path, kind)``, in wire order."""
+    if isinstance(mms_type, StructureType):
+        return [leaf for name, t in mms_type.components for leaf in _leaves(t, (*path, name))]
+    if isinstance(mms_type, ArrayType):
+        element = mms_type.element
+        return [leaf for i in range(mms_type.count) for leaf in _leaves(element, (*path, str(i)))]
+    if not isinstance(mms_type, PrimitiveType):
+        raise ValueError(f"{'.'.join(path) or 'it'} has a named type ({mms_type})")
+    return [(path, _kind(mms_type))]
+
+
+def _flatten(data: Any, mms_type: MmsType) -> list[Any]:
+    """`data`'s leaves as plain values, in `_leaves` order. A shape other than
+    the type's raises ValueError: positions would name the wrong leaves."""
+    if isinstance(mms_type, StructureType):
+        parts, types = getattr(data, "members", None), [t for _, t in mms_type.components]
+    elif isinstance(mms_type, ArrayType):
+        parts, types = getattr(data, "elements", None), [mms_type.element] * mms_type.count
+    elif isinstance(data, StructureData | ArrayData) or not isinstance(mms_type, PrimitiveType):
+        raise ValueError("a structure where the type has a primitive")
+    else:
+        return [_leaf(data, _kind(mms_type))]
+    if parts is None or len(parts) != len(types):
+        raise ValueError(f"{type(data).__name__} where the type has {len(types)} components")
+    return [v for part, t in zip(parts, types, strict=True) for v in _flatten(part, t)]
+
+
+def _leaf(data: Any, kind: str) -> Any:
+    if kind == "bits":
+        return int.from_bytes(data.value, "big") >> data.unused_bits
+    if kind == "time":
+        return _ns(data.value)
+    return str(data.value) if kind == "str" else data.value
+
+
+def _values(member: Member, mms_type: MmsType, data: Any) -> Values:
+    flat = _flatten(data, mms_type)
+    return tuple((ref, v) for (ref, _), v in zip(member.leaves, flat, strict=True))
 
 
 def _plain(data: Any) -> Any:

@@ -5,7 +5,8 @@ reference a module-level callable), a shared registry populated by ``cli/app.py`
 at startup, and one global namespace rather than per-interface action paths.
 
 Every action is read-only. GOOSE is subscribe-only here: nothing is ever
-published onto the bus.
+published onto the bus. MMS is read-only too: the only writes are the
+reservation of the report control blocks the configuration names.
 """
 
 from __future__ import annotations
@@ -26,11 +27,14 @@ from .demo import DEMO_PCAP
 
 if TYPE_CHECKING:
     from .capture import CaptureSession
+    from .station import MmsStation
 
 logger = logging.getLogger(__name__)
 
 #: Live capture sessions, keyed by interface name. Populated by `cli/app.py`.
 CAPTURES: dict[str, CaptureSession] = {}
+#: Running MMS servers, keyed by name. Populated by `cli/app.py`.
+SERVERS: dict[str, MmsStation] = {}
 
 
 def _replays() -> list[tuple[str, Any]]:
@@ -175,16 +179,19 @@ def list_gocbs() -> dict[str, Any]:
     "goose_stnum_gaps, goose_sqnum_gaps, goose_tal_expired, goose_schema_changes). "
     "kernel_drops climbing means the kernel buffer is too small; goose_tal_expired "
     "climbing with no gaps means a publisher is late, not lost. status is error "
-    "when a capture has ended.",
+    "when a capture has ended. Per MMS server: state (connecting, connected, "
+    "reconnecting, failed), the enabled report control blocks, connects, reports, "
+    "reads, rows, and the last error.",
     read_only=True,
 )
 def get_status() -> dict[str, Any]:
     if replays := _replays():
         rows = [{"name": n, "running": True, **decode.counters(d.metrics())} for n, d in replays]
         return {"status": "success", "interfaces": rows}
+    servers = [s.status() for s in SERVERS.values()]
     sessions, err = _sessions()
-    if err:
-        return {**err, "interfaces": []}
+    if err and not servers:
+        return {**err, "interfaces": [], "servers": []}
     rows = [s.status() for s in sessions]
     if ended := [str(r["name"]) for r in rows if not r["running"]]:
         return {
@@ -192,8 +199,31 @@ def get_status() -> dict[str, Any]:
             "message": f"Capture ended on {', '.join(ended)}: see its 'error' and the "
             "extension log. Restart the extension to capture again.",
             "interfaces": rows,
+            "servers": servers,
         }
-    return {"status": "success", "interfaces": rows}
+    return {"status": "success", "interfaces": rows, "servers": servers}
+
+
+@action(
+    "Browse Server",
+    "Connect to an IEC 61850 server over MMS and list what it offers: logical "
+    "devices, data sets with their member count, and report control blocks with "
+    "their data set and whether another client holds them. Copy a block's "
+    "reference into the server's 'Report Control Blocks'. Reads only.",
+    timeout=60.0,
+    standalone=True,
+    read_only=True,
+)
+@action.text("host", title="Host", description="IP address or host name of the IED")
+@action.number("port", title="Port", required=False, default=102, minimum=1, maximum=65535)
+def browse(host: str, port: int = 102) -> dict[str, Any]:
+    from . import mms
+
+    try:
+        devices = mms.browse(host.strip(), int(port))
+    except mms.MmsError as exc:
+        return {"status": "error", "message": str(exc)}
+    return {"status": "success", "logical_devices": devices}
 
 
 @action(

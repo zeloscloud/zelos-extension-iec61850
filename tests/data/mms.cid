@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- tests/test_mms.py: one logical device, a float measurand and a boolean status,
-     a data set of both, one URCB and one BRCB on it. -->
+<!-- tests/test_mms.py, tests/test_station.py: one logical device. dsMeas holds a float
+     attribute and a boolean attribute, with one URCB and one BRCB on it. dsObj holds
+     whole data objects (measurand and switch position with q and t), with one URCB. -->
 <SCL xmlns="http://www.iec.ch/61850/2003/SCL" version="2007" revision="B">
   <IED name="IED1" manufacturer="Zelos" type="Test">
     <AccessPoint name="AP1">
@@ -11,11 +12,17 @@
               <FCDA ldInst="LD0" lnClass="MMDC" lnInst="1" doName="Watt" daName="mag.f" fc="MX"/>
               <FCDA ldInst="LD0" lnClass="GGIO" lnInst="1" doName="Ind1" daName="stVal" fc="ST"/>
             </DataSet>
+            <DataSet name="dsObj">
+              <FCDA ldInst="LD0" lnClass="MMDC" lnInst="1" doName="Watt" fc="MX"/>
+              <FCDA ldInst="LD0" lnClass="XSWI" lnInst="1" doName="Pos" fc="ST"/>
+            </DataSet>
+            <ReportControl name="urcbObj" datSet="dsObj" buffered="false" confRev="1"/>
             <ReportControl name="urcbMeas" datSet="dsMeas" buffered="false" confRev="1"/>
             <ReportControl name="brcbMeas" datSet="dsMeas" buffered="true" confRev="1"/>
           </LN0>
           <LN lnClass="MMDC" inst="1" lnType="MMDC_T"/>
           <LN lnClass="GGIO" inst="1" lnType="GGIO_T"/>
+          <LN lnClass="XSWI" inst="1" lnType="XSWI_T"/>
         </LDevice>
       </Server>
     </AccessPoint>
@@ -23,6 +30,10 @@
   <DataTypeTemplates>
     <LNodeType id="LLN0_T" lnClass="LLN0">
       <DO name="Mod" type="ENC_T"/>
+      <DO name="NamPlt" type="LPL_T"/>
+    </LNodeType>
+    <LNodeType id="XSWI_T" lnClass="XSWI">
+      <DO name="Pos" type="DPS_T"/>
     </LNodeType>
     <LNodeType id="MMDC_T" lnClass="MMDC">
       <DO name="Watt" type="MV_T"/>
@@ -36,6 +47,16 @@
     <DOType id="MV_T" cdc="MV">
       <DA name="mag" bType="Struct" type="AnalogValue_T" fc="MX" dchg="true"/>
       <DA name="q" bType="Quality" fc="MX" qchg="true"/>
+      <DA name="t" bType="Timestamp" fc="MX"/>
+    </DOType>
+    <DOType id="DPS_T" cdc="DPS">
+      <DA name="stVal" bType="Dbpos" fc="ST" dchg="true"/>
+      <DA name="q" bType="Quality" fc="ST" qchg="true"/>
+      <DA name="t" bType="Timestamp" fc="ST"/>
+    </DOType>
+    <DOType id="LPL_T" cdc="LPL">
+      <DA name="vendor" bType="VisString255" fc="DC"/>
+      <DA name="swRev" bType="VisString255" fc="DC"/>
     </DOType>
     <DOType id="SPS_T" cdc="SPS">
       <DA name="stVal" bType="BOOLEAN" fc="ST" dchg="true"/>

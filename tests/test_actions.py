@@ -20,9 +20,10 @@ def test_actions_register_under_their_bare_names_and_flags_are_pinned():
         name: (getattr(actions, name)._action.read_only, getattr(actions, name)._action.hidden)
         for name in registered
     }
-    # Every action is read-only: GOOSE is subscribe-only here.
+    # Every action is read-only: GOOSE is subscribe-only, MMS browse only reads.
     assert flags == {
         "auto_config": (True, True),
+        "browse": (True, False),
         "list_interfaces": (True, True),
         "check_permissions": (True, False),
         "list_gocbs": (True, False),

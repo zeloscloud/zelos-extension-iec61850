@@ -23,6 +23,7 @@ from ..capture import (
     CaptureSession,
     ConfigError,
     InterfaceConfig,
+    make_trace_source,
     parse_interfaces,
     replay_pcap,
 )
@@ -30,6 +31,8 @@ from ..constants import DEFAULT_PREFIX, RESERVED_NAMES, name_error
 from ..converter import capture_stem
 from ..decode import GooseConfig, parse_goose
 from ..demo import DEMO_PCAP
+from ..mms import ServerConfig
+from ..station import MmsStation, Tree, parse_servers
 
 logger = logging.getLogger(__name__)
 
@@ -112,8 +115,12 @@ def _install_replay_shutdown() -> None:
     signal.signal(signal.SIGINT, handler)
 
 
-def run_sessions(configs: list[InterfaceConfig], prefix: str) -> None:
-    """Start every live session, wait for shutdown, then stop them in reverse order.
+def run_sessions(
+    configs: list[InterfaceConfig], prefix: str, servers: list[ServerConfig] | None = None
+) -> None:
+    """Start every capture and MMS server, wait for shutdown, then stop them in
+    reverse order. An MMS server that cannot go on (a block that does not
+    exist, a refused setting) stops everything and raises its error.
 
     A capture that ends while running is one ERROR line; the rest keep
     capturing. When the last one ends this raises, and the caller exits
@@ -123,14 +130,26 @@ def run_sessions(configs: list[InterfaceConfig], prefix: str) -> None:
     stop_event = threading.Event()
     _install_shutdown(stop_event)
     started: list[CaptureSession] = []
+    stations: list[MmsStation] = []
     try:
         for cfg in configs:
             session = CaptureSession(cfg, prefix)
             session.start()
             started.append(session)
             goose_actions.CAPTURES[session.name] = session
+        if servers:
+            tree = Tree(make_trace_source(prefix))
+            for server in servers:
+                station = MmsStation(server, tree, on_fatal=stop_event.set)
+                station.start()
+                stations.append(station)
+                goose_actions.SERVERS[station.name] = station
         logger.info(
-            "Subscribed on %d interface%s; waiting for stop", len(started), "s"[: len(started) != 1]
+            "Subscribed on %d interface%s, %d MMS server%s; waiting for stop",
+            len(started),
+            "s"[: len(started) != 1],
+            len(stations),
+            "s"[: len(stations) != 1],
         )
         # Polled: on Windows a bare wait() is not interrupted by Ctrl+C, the
         # agent's stop signal, so the handler would never run.
@@ -146,9 +165,14 @@ def run_sessions(configs: list[InterfaceConfig], prefix: str) -> None:
                     raise RuntimeError(f"{message}. Capture has stopped on all interfaces.")
                 logger.error("%s", message)
     finally:
+        for station in reversed(stations):
+            station.stop()
         for session in reversed(started):
             session.stop()
         goose_actions.CAPTURES.clear()
+        goose_actions.SERVERS.clear()
+    if failed := next((s.fatal for s in stations if s.fatal), None):
+        raise failed
 
 
 def run_replay(
@@ -185,29 +209,33 @@ def run_app_mode(demo_flag: bool, file: Path | None) -> None:
     replay = str(advanced.get("replay_pcap") or "").strip()
 
     interfaces: list[InterfaceConfig] = []
+    servers: list[ServerConfig] = []
     replay_goose = GooseConfig()
     try:
         if replay:
             replay_goose = parse_goose({"scl": advanced.get("replay_scl")})
         else:
             interfaces = parse_interfaces(config)
+            servers = parse_servers(config)
     except ConfigError as exc:
         _fail(str(exc))
-    if not replay and not interfaces:
+    if not replay and not interfaces and not servers:
         _fail(
-            "Nothing to do: no interfaces are configured and no replay file is set. "
-            "Add an interface (run the 'List interfaces' action to see what this "
-            "machine has), or set 'Replay PCAP File' to decode a capture instead."
+            "Nothing to do: no interfaces or MMS servers are configured and no replay "
+            "file is set. Add an interface for GOOSE (run the 'List interfaces' action to "
+            "see what this machine has), add an MMS server, or set 'Replay PCAP File' to "
+            "decode a capture instead."
         )
 
     output_file = resolve_output_file(file)
     init_sdk(prefix)
     # One legible refusal before a writer or capture exists; the CLI refuses in
-    # CaptureSession.start / make_decoder.
-    try:
-        decode.require()
-    except RuntimeError as exc:
-        _fail(str(exc))
+    # CaptureSession.start / make_decoder. MMS alone needs no decoder.
+    if replay or interfaces:
+        try:
+            decode.require()
+        except RuntimeError as exc:
+            _fail(str(exc))
     logger.info("Trace prefix: %s", prefix)
 
     if replay:
@@ -232,7 +260,7 @@ def run_app_mode(demo_flag: bool, file: Path | None) -> None:
             if output_file:
                 logger.info("Recording trace to: %s", output_file)
                 stack.enter_context(zelos_sdk.TraceWriter(str(output_file)))
-            run_sessions(interfaces, prefix)
+            run_sessions(interfaces, prefix, servers)
     except CaptureDeniedError as exc:
         # Exit cleanly with the remediation: the supervisor does not restart on
         # crash, so this message is the fix.

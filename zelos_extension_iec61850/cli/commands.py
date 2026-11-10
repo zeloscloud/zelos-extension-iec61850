@@ -21,6 +21,8 @@ from ..capture import (
 from ..constants import DEFAULT_PREFIX, RESERVED_NAMES, name_error
 from ..converter import capture_stem, convert_pcap, resolve_output
 from ..decode import GooseConfig, parse_goose
+from ..mms import DEFAULT_PORT, MmsError, ServerConfig, browse
+from ..station import parse_servers
 from .app import init_sdk, resolve_output_file, run_replay, run_sessions
 
 logger = logging.getLogger(__name__)
@@ -68,7 +70,12 @@ _prefix_option = click.option(
 )
 
 
-def _run(configs: list[InterfaceConfig], prefix: str, file: Path | None) -> None:
+def _run(
+    configs: list[InterfaceConfig],
+    prefix: str,
+    file: Path | None,
+    servers: list[ServerConfig] | None = None,
+) -> None:
     import zelos_sdk
 
     init_sdk(prefix)
@@ -77,9 +84,9 @@ def _run(configs: list[InterfaceConfig], prefix: str, file: Path | None) -> None
         if output_file:
             logger.info("Recording trace to: %s", output_file)
             with zelos_sdk.TraceWriter(str(output_file)):
-                run_sessions(configs, prefix)
+                run_sessions(configs, prefix, servers)
         else:
-            run_sessions(configs, prefix)
+            run_sessions(configs, prefix, servers)
     except CaptureDeniedError as exc:
         raise click.ClickException(f"{exc}\n\n{exc.remediation}") from exc
     except (ValueError, RuntimeError) as exc:
@@ -207,3 +214,61 @@ def convert_cmd(
     except (ValueError, FileExistsError, RuntimeError) as exc:
         raise click.ClickException(str(exc)) from exc
     click.echo(f"{result['input_file']} -> {result['output_file']} ({result['packets']:,} packets)")
+
+
+_port_option = click.option("--port", default=DEFAULT_PORT, show_default=True, help="MMS TCP port.")
+
+
+@click.command("browse")
+@click.argument("host")
+@_port_option
+def browse_cmd(host: str, port: int) -> None:
+    """List an IEC 61850 server's data sets and report control blocks over MMS."""
+    try:
+        devices = browse(host, port)
+    except MmsError as exc:
+        raise click.ClickException(str(exc)) from exc
+    for ld, device in devices.items():
+        click.echo(ld)
+        for data_set in device["data_sets"]:
+            click.echo(f"  data set  {data_set['ref']}  ({data_set['members']} members)")
+        for block in device["report_blocks"]:
+            click.echo(f"  report    {block['ref']}  {block['data_set'] or '-'}  {block['state']}")
+
+
+@click.command("mms")
+@click.argument("host")
+@_port_option
+@click.option("--report", "reports", multiple=True, help="Report control block: LD/LLN0$RP$name01.")
+@click.option(
+    "--read", "reads", multiple=True, help="Polled read as REF or REF=SECONDS (default 1 s)."
+)
+@_prefix_option
+@_file_option
+def mms_cmd(
+    host: str,
+    port: int,
+    reports: tuple[str, ...],
+    reads: tuple[str, ...],
+    prefix: str,
+    file: Path | None,
+) -> None:
+    """Acquire from one IEC 61850 server over MMS without app configuration.
+
+    Examples:
+
+      zelos-extension-iec61850 mms 10.0.0.5 --report 'IED1LD0/LLN0$RP$urcbMeas01'
+
+      zelos-extension-iec61850 mms 10.0.0.5 --read 'IED1LD0/MMXU1.TotW[MX]=0.5' --file
+    """
+    polled = []
+    for item in reads:
+        ref, _, interval = item.rpartition("=") if "=" in item else (item, "", "1")
+        polled.append({"ref": ref, "interval_s": interval})
+    try:
+        servers = parse_servers(
+            {"servers": [{"host": host, "port": port, "reports": list(reports), "reads": polled}]}
+        )
+    except ConfigError as exc:
+        raise click.ClickException(str(exc)) from exc
+    _run([], prefix, file, servers)

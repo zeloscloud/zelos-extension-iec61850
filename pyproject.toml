@@ -1,7 +1,7 @@
 [project]
 name = "zelos-extension-iec61850"
 version = "0.3.1"
-description = "IEC 61850 GOOSE subscriber for Zelos"
+description = "IEC 61850 GOOSE subscriber and MMS client for Zelos"
 authors = [{ name = "zeloscloud", email = "info@zeloscloud.io" }]
 readme = "README.md"
 license = { text = "MIT" }
