@@ -96,6 +96,7 @@ zelos extensions start zeloscloud.zelos-extension-iec61850 --config '{"servers":
 
 - a row holds only what its report carried: a data-change report leaves the other attributes empty
 - `reason` is a bitmask: 1 data change, 2 quality change, 4 data update, 8 integrity, 16 general interrogation
+- `sqNum` and `rpt_sqnum` are the IED's counter: it wraps at 255 on an unbuffered block and at 65535 on a buffered one, and starts over when the block is enabled again
 - every block is enabled with data change, quality change, a 2 s integrity period and a general interrogation, so the first report carries every member
 - `q` and `stVal` of a double point are the bit string as an integer (position: 1 off, 2 on); `t` is ns since the epoch; the event time is the receive time
 - a lost connection is retried and the blocks enabled again; a block another client holds is retried until it frees; a block or reference the server does not have stops the extension with the reason

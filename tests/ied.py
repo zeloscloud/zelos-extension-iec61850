@@ -20,12 +20,16 @@ from pathlib import Path
 
 from open61850.server import IedModel, MmsServer
 
+KINDS = ("float", "bool", "int", "dbpos")
+
 
 def _value(kind: str, step: int, index: int) -> float | bool | int:
     if kind == "float":
         return step * 1.5 + index * 1000
     if kind == "bool":
         return step % 2 == 1
+    if kind == "int":
+        return step * 3 + index
     return 1 + step % 2  # Dbpos: off (1), on (2)
 
 
@@ -38,7 +42,7 @@ def main() -> None:
     parser.add_argument("--period", type=float, default=0.2)
     parser.add_argument("--steps", type=int, default=0, help="0: until stopped")
     parser.add_argument("--delay", type=float, default=0.0, help="before the first step")
-    for kind in ("float", "bool", "dbpos"):
+    for kind in KINDS:
         parser.add_argument(f"--{kind}", action="append", default=[], metavar="REF[FC]")
     args = parser.parse_args()
 
@@ -49,7 +53,7 @@ def main() -> None:
     server = MmsServer(model, args.host, args.port)
     server.start()
     print(f"listening {server.port}", flush=True)
-    targets = [(kind, ref) for kind in ("float", "bool", "dbpos") for ref in getattr(args, kind)]
+    targets = [(kind, ref) for kind in KINDS for ref in getattr(args, kind)]
     try:
         with args.log.open("a") as log:
             stop.wait(args.delay)
