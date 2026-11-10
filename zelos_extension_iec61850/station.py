@@ -117,6 +117,7 @@ class Tree:
         self._owners: dict[str, str] = {}  # logical device -> server label
         self._fields: dict[tuple[str, str], tuple[str, str]] = {}  # (leaf, fc) -> (event, field)
         self._schemas: dict[str, tuple] = {}
+        self._refused: set[tuple[str, str]] = set()  # (rcb, member) already warned about
 
     def register(self, label: str, members: Iterable[Member], rcbs: Iterable[str]) -> None:
         """Declare the data object events `members` fill and the `rcbs` events.
@@ -178,7 +179,15 @@ class Tree:
         reasons: dict[str, int] = {}
         for entry in report.entries:
             if entry.error:
-                logger.debug("%s: %s: %s", report.rcb, entry.reference, entry.error)
+                # The IED sent an access error in place of the value: say so once.
+                if (key := (report.rcb, entry.reference)) not in self._refused:
+                    self._refused.add(key)
+                    logger.warning(
+                        "%s: the IED reports %s as %s; it gets no rows.",
+                        report.rcb,
+                        entry.reference,
+                        entry.error,
+                    )
                 continue
             reason = sum(REASON_BITS.get(r, 0) for r in entry.reasons)
             for leaf, value in entry.values:
