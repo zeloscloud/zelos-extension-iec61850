@@ -12,6 +12,7 @@ import threading
 import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from open61850.server import IedModel, MmsServer
@@ -123,6 +124,18 @@ def test_report_names_member_value_and_reason(
 
     session.close()  # releases without complaint
     assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
+
+
+def test_a_data_set_named_without_its_device_is_the_blocks_own() -> None:
+    """Seen from a second stack: DatSet as ``LLN0$name``, where 8-1 has ``LD/LLN0$name``."""
+    from open61850.mms import ObjectName
+
+    from zelos_extension_iec61850.mms import _dat_set
+
+    block = ObjectName("LLN0$RP$urcb01", LD)
+    assert _dat_set(SimpleNamespace(rcb=block, dat_set="LLN0$dsMeas")) == f"{LD}/LLN0$dsMeas"
+    assert _dat_set(SimpleNamespace(rcb=block, dat_set=f"{LD}/LLN0$dsMeas")) == f"{LD}/LLN0$dsMeas"
+    assert _dat_set(SimpleNamespace(rcb=block, dat_set=None)) == ""
 
 
 def test_reconnects_after_a_server_restart(

@@ -364,7 +364,7 @@ class Session:
             )
         if not status.dat_set:
             raise MmsError(f"{self._where}: {text} has no data set (DatSet is empty).")
-        typed = [self._typed(m) for m in self.dataset_members(status.dat_set)]
+        typed = [self._typed(m) for m in self.dataset_members(_dat_set(status))]
         members = tuple(m for m, _ in typed)
         rpt_id = status.rpt_id or text  # 8-1: an empty RptID reports as the block's reference
         if (other := self._blocks.get(rpt_id)) is not None:
@@ -596,13 +596,20 @@ def browse(host: str, port: int = DEFAULT_PORT, *, timeout: float = DEFAULT_TIME
                     {
                         "ref": f"{block.ld}/{block.object_name.item}",
                         "buffered": block.fc == "BR",
-                        "data_set": status.dat_set or "",
+                        "data_set": _dat_set(status),
                         "enabled": bool(status.rpt_ena),
                         "free": status.free,
                         "state": status.describe(),
                     }
                 )
     return out
+
+
+def _dat_set(status: _rcb.RcbStatus) -> str:
+    """The block's DatSet as ``LD/LN$name``. 8-1 puts the logical device in it;
+    some servers send ``LN$name`` alone, meaning the block's own device."""
+    dat_set = status.dat_set or ""
+    return dat_set if "/" in dat_set or not dat_set else f"{status.rcb.domain}/{dat_set}"
 
 
 def _rcb_names(ref: str) -> list[ObjectName]:
