@@ -27,3 +27,6 @@ actions.json
 # Local environment
 .env
 .envrc
+
+# Agent worktrees and local settings
+.claude/
