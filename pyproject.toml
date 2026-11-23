@@ -27,7 +27,7 @@ dependencies = [
     # Exact pin, as the Packet extension: the decoder surface and the privileged
     # helper are matched to one release. `decode.py` still probes for the GOOSE
     # decoder and refuses with the version it needs.
-    "zelos-packet==0.0.6",
+    "zelos-packet==0.0.7",
 ]
 
 [project.scripts]
