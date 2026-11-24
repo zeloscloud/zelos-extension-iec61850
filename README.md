@@ -18,7 +18,7 @@ Read-only by design: this extension never publishes a GOOSE message.
 
 In the app:
 
-1. **Install** IEC 61850 from the Extensions view
+1. **Install** IEC-61850 from the Extensions view
 2. **Configure**: add an interface and pick the NIC on the station bus; optionally its SCL file, so members get their IEC 61850 names
 3. **Save & Start**
 4. **Plot**: control blocks appear under **GOOSE → goID**; drag a member into the workspace
@@ -58,7 +58,7 @@ sudo /path/to/python -m zelos_packet install-helper
 
 A one-minute capture ships with the extension: two publishers, one VLAN-tagged, tripping and resetting.
 
-- **App**: run `IEC 61850/demo_capture_path`, paste the path into **Advanced → Replay PCAP File**, save, start
+- **App**: run `IEC-61850/demo_capture_path`, paste the path into **Advanced → Replay PCAP File**, save, start
 - **CLI**: `uv run zelos-extension-iec61850 --demo`
 
 Either way it plays once and the extension exits.
@@ -96,20 +96,20 @@ keeps everything else on the station bus (Sampled Values, IP) out of the trace.
 
 | Action | |
 | --- | --- |
-| `IEC 61850/list_interfaces` | NICs on the machine running the agent |
-| `IEC 61850/check_permissions` | Can we capture? If not, the exact fix |
-| `IEC61850/list_gocbs` | Every control block seen: goID, gocbRef, datSet, APPID, publisher, stNum/sqNum/confRev, members, alive |
-| `IEC61850/get_status` | Per-interface capture and decoder counters (drops, malformed, gaps, expired) |
-| `IEC 61850/convert_pcap` | Convert a pcap to `.trz`, optionally with an SCL. Runs without the extension started |
-| `IEC 61850/demo_capture_path` | Path of the bundled demo capture, for `advanced.replay_pcap`. Runs without the extension started |
+| `IEC-61850/list_interfaces` | NICs on the machine running the agent |
+| `IEC-61850/check_permissions` | Can we capture? If not, the exact fix |
+| `IEC-61850/list_gocbs` | Every control block seen: goID, gocbRef, datSet, APPID, publisher, stNum/sqNum/confRev, members, alive |
+| `IEC-61850/get_status` | Per-interface capture and decoder counters (drops, malformed, gaps, expired) |
+| `IEC-61850/convert_pcap` | Convert a pcap to `.trz`, optionally with an SCL. Runs without the extension started |
+| `IEC-61850/demo_capture_path` | Path of the bundled demo capture, for `advanced.replay_pcap`. Runs without the extension started |
 
-Actions that run without the extension started are addressed by the extension's name, `IEC 61850`, which has a space: quote the path in a shell.
+`list_gocbs` and `get_status` need the extension running; the rest also run with it stopped.
 
 ```bash
-zelos actions execute "IEC 61850/check_permissions"
+zelos actions execute IEC-61850/check_permissions
 ```
 
-`list_gocbs` and `get_status` need the extension running and are addressed under `IEC61850`.
+A capture that ends while running is logged and reported by `get_status`; when the last one ends, the extension logs the reason and exits with an error. Restart it to capture again.
 
 ## CLI
 

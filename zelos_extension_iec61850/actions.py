@@ -1,4 +1,4 @@
-"""Free-floating GOOSE actions registered under ``IEC61850/<name>``.
+"""Free-floating GOOSE actions registered under ``IEC-61850/<name>``.
 
 Same shape as the Packet extension: free functions (so ``choices=`` can
 reference a module-level callable), a shared registry populated by ``cli/app.py``
@@ -194,7 +194,8 @@ def list_gocbs(interface: str = "") -> dict[str, Any]:
     "and GOOSE decoder counters (goose_frames, goose_malformed, goose_gocbs, "
     "goose_stnum_gaps, goose_sqnum_gaps, goose_tal_expired, goose_schema_changes). "
     "kernel_drops climbing means the kernel buffer is too small; goose_tal_expired "
-    "climbing with no gaps means a publisher is late, not lost.",
+    "climbing with no gaps means a publisher is late, not lost. status is error "
+    "when a capture has ended.",
     read_only=True,
 )
 @action.select(
@@ -212,7 +213,15 @@ def get_status(interface: str = "") -> dict[str, Any]:
     sessions, err = _sessions(interface)
     if err:
         return {**err, "interfaces": []}
-    return {"status": "success", "interfaces": [s.status() for s in sessions]}
+    rows = [s.status() for s in sessions]
+    if ended := [str(r["name"]) for r in rows if not r["running"]]:
+        return {
+            "status": "error",
+            "message": f"Capture ended on {', '.join(ended)}: see its 'error' and the "
+            "extension log. Restart the extension to capture again.",
+            "interfaces": rows,
+        }
+    return {"status": "success", "interfaces": rows}
 
 
 @action(
@@ -281,8 +290,8 @@ def demo_capture_path() -> dict[str, Any]:
 def register_actions(registry: ActionsRegistry) -> list[str]:
     """Register every ``@action``-decorated free function by its bare name.
 
-    The ``IEC61850/`` prefix consumers see comes from
-    ``zelos_sdk.init(name="IEC61850", actions=True)``.
+    The ``IEC-61850/`` prefix consumers see comes from
+    ``zelos_sdk.init(name=ACTION_PREFIX, actions=True)``.
     """
     module = sys.modules[__name__]
     registered: list[str] = []

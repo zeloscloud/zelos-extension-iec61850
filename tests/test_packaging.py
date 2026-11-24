@@ -34,14 +34,14 @@ def test_entry_point_is_packaged() -> None:
 
 
 def test_entry_module_re_exports_the_action_prefix() -> None:
-    """At-rest and live actions must land in one namespace: the manifest name
-    without its space, so a user types what they read. The trace prefix is the
-    protocol's, not the extension's: GOOSE rows stay under GOOSE when MMS joins."""
+    """At-rest and live actions must land in one namespace: the manifest name,
+    so a user types what they read. The trace prefix is the protocol's, not the
+    extension's: GOOSE rows stay under GOOSE when MMS joins."""
     import main
     from zelos_extension_iec61850 import ACTION_PREFIX
     from zelos_extension_iec61850.constants import DEFAULT_PREFIX
 
-    assert main.ACTION_PREFIX == ACTION_PREFIX == MANIFEST["name"].replace(" ", "")
+    assert main.ACTION_PREFIX == ACTION_PREFIX == MANIFEST["name"] == "IEC-61850"
     assert DEFAULT_PREFIX == "GOOSE"
 
 

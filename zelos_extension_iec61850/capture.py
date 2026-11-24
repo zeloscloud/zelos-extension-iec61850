@@ -278,10 +278,18 @@ class CaptureSession:
         return {
             "interface": self.config.interface,
             "name": self.name,
-            "running": True,
+            "running": bool(getattr(cap, "is_active", True)),
+            "error": getattr(cap, "error", None),
             **{f: getattr(stats, f, None) for f in STATS_FIELDS},
             **decode.counters(cap.metrics()),
         }
+
+    def failure(self) -> str | None:
+        """Why a started capture is no longer running, or None while it is."""
+        cap = self._capture
+        if cap is None or getattr(cap, "is_active", True):
+            return None
+        return getattr(cap, "error", None) or "the capture helper exited"
 
     def control_blocks(self) -> list[dict[str, Any]]:
         return decode.control_blocks(self._capture) if self._capture is not None else []
@@ -291,10 +299,13 @@ class CaptureSession:
         which drains and hands everything to the agent, then reaps it."""
         if self._capture is None:
             return
+        ended = self.failure()
         try:
             self._capture.stop()
         except Exception:
-            logger.exception("Error stopping capture on %s", self.config.interface)
+            # An ended capture re-raises the failure already reported.
+            if not ended:
+                logger.exception("Error stopping capture on %s", self.config.interface)
         self._capture = None
         logger.info("Stopped capture on %s", self.config.interface)
 

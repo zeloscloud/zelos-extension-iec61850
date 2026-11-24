@@ -19,9 +19,9 @@ from .capture import (
 #: at-rest inventory the packaging step dumps from `main.py`, which re-exports
 #: it. A mismatch silently produces two unrelated action trees.
 #:
-#: Matches `name` in `extension.toml` and the default `advanced.prefix`, so the
-#: address a user reads in the app is the one they type.
-ACTION_PREFIX = "IEC61850"
+#: Equals `name` in `extension.toml`, so actions have one address whether or
+#: not the extension is running, and it needs no quoting in a shell.
+ACTION_PREFIX = "IEC-61850"
 
 __all__ = [
     "ACTION_PREFIX",
