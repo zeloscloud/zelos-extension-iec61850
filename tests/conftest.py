@@ -29,6 +29,8 @@ class FakeCapture:
     """
 
     instances: list[FakeCapture] = []
+    is_active = True
+    error = None
 
     def __init__(
         self,

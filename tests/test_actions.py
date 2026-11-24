@@ -38,6 +38,8 @@ def test_list_gocbs_and_get_status_report_nothing_running():
     actions.CAPTURES.clear()
     assert actions.list_gocbs()["status"] == "warning"
     assert actions.get_status()["status"] == "warning"
+    # Through the SDK's parameter check, called with no arguments.
+    assert actions.get_status._action.execute().value["status"] == "warning"
 
 
 def test_blocks_and_status_over_a_running_capture(fake_packet):
@@ -49,7 +51,7 @@ def test_blocks_and_status_over_a_running_capture(fake_packet):
         [block] = actions.list_gocbs()["control_blocks"]
         assert (block["interface"], block["goID"], block["alive"]) == ("en0", "P1Q1BCU_Trip", True)
         assert [m["name"] for m in block["members"]] == ["d00", "d01"]
-        [status] = actions.get_status("en0")["interfaces"]
+        [status] = actions.get_status()["interfaces"]
         assert status["running"] and status["goose_gocbs"] == 2
     finally:
         actions.CAPTURES.clear()

@@ -1,4 +1,4 @@
-"""Free-floating GOOSE actions registered under ``IEC61850/<name>``.
+"""Free-floating GOOSE actions registered under ``IEC-61850/<name>``.
 
 Same shape as the Packet extension: free functions (so ``choices=`` can
 reference a module-level callable), a shared registry populated by ``cli/app.py``
@@ -33,27 +33,14 @@ logger = logging.getLogger(__name__)
 CAPTURES: dict[str, CaptureSession] = {}
 
 
-def _available_captures(*_args: Any) -> list[str]:
-    """`choices=` provider; evaluated at form-render time."""
-    return sorted(CAPTURES.keys() | capture_mod.REPLAYS.keys())
-
-
-def _replays(name: str) -> list[tuple[str, Any]]:
+def _replays() -> list[tuple[str, Any]]:
     """The running replay's decoder, as (name, decoder); live and replay never mix."""
-    return [(n, d) for n, d in capture_mod.REPLAYS.items() if name in ("", n)]
+    return sorted(capture_mod.REPLAYS.items())
 
 
-def _sessions(name: str) -> tuple[list[CaptureSession], dict[str, Any] | None]:
-    """The named session, or every running one; an error dict on a bad name."""
-    if name:
-        session = CAPTURES.get(name)
-        if session is None:
-            return [], {
-                "status": "error",
-                "message": f"Unknown interface {name!r}. Running: {_available_captures()}",
-            }
-        return [session], None
-    sessions = [CAPTURES[key] for key in _available_captures()]
+def _sessions() -> tuple[list[CaptureSession], dict[str, Any] | None]:
+    """Every running session, or a warning dict when there is none."""
+    sessions = [CAPTURES[key] for key in sorted(CAPTURES)]
     if not sessions:
         return [], {
             "status": "warning",
@@ -169,19 +156,12 @@ def check_permissions(interface: str = "") -> dict[str, Any]:
     "(heard within its timeAllowedtoLive). Live values are in the trace.",
     read_only=True,
 )
-@action.select(
-    "interface",
-    title="Interface",
-    description="Leave empty for every running interface.",
-    required=False,
-    default="",
-    choices=_available_captures,
-)
-def list_gocbs(interface: str = "") -> dict[str, Any]:
-    if replays := _replays(interface):
+def list_gocbs() -> dict[str, Any]:
+    """No interface parameter: a select left empty fails the SDK's choice check."""
+    if replays := _replays():
         blocks = [{"interface": n, **b} for n, d in replays for b in decode.control_blocks(d)]
     else:
-        sessions, err = _sessions(interface)
+        sessions, err = _sessions()
         if err:
             return {**err, "control_blocks": []}
         blocks = [{"interface": s.name, **b} for s in sessions for b in s.control_blocks()]
@@ -194,25 +174,26 @@ def list_gocbs(interface: str = "") -> dict[str, Any]:
     "and GOOSE decoder counters (goose_frames, goose_malformed, goose_gocbs, "
     "goose_stnum_gaps, goose_sqnum_gaps, goose_tal_expired, goose_schema_changes). "
     "kernel_drops climbing means the kernel buffer is too small; goose_tal_expired "
-    "climbing with no gaps means a publisher is late, not lost.",
+    "climbing with no gaps means a publisher is late, not lost. status is error "
+    "when a capture has ended.",
     read_only=True,
 )
-@action.select(
-    "interface",
-    title="Interface",
-    description="Leave empty for every running interface.",
-    required=False,
-    default="",
-    choices=_available_captures,
-)
-def get_status(interface: str = "") -> dict[str, Any]:
-    if replays := _replays(interface):
+def get_status() -> dict[str, Any]:
+    if replays := _replays():
         rows = [{"name": n, "running": True, **decode.counters(d.metrics())} for n, d in replays]
         return {"status": "success", "interfaces": rows}
-    sessions, err = _sessions(interface)
+    sessions, err = _sessions()
     if err:
         return {**err, "interfaces": []}
-    return {"status": "success", "interfaces": [s.status() for s in sessions]}
+    rows = [s.status() for s in sessions]
+    if ended := [str(r["name"]) for r in rows if not r["running"]]:
+        return {
+            "status": "error",
+            "message": f"Capture ended on {', '.join(ended)}: see its 'error' and the "
+            "extension log. Restart the extension to capture again.",
+            "interfaces": rows,
+        }
+    return {"status": "success", "interfaces": rows}
 
 
 @action(
@@ -281,8 +262,8 @@ def demo_capture_path() -> dict[str, Any]:
 def register_actions(registry: ActionsRegistry) -> list[str]:
     """Register every ``@action``-decorated free function by its bare name.
 
-    The ``IEC61850/`` prefix consumers see comes from
-    ``zelos_sdk.init(name="IEC61850", actions=True)``.
+    The ``IEC-61850/`` prefix consumers see comes from
+    ``zelos_sdk.init(name=ACTION_PREFIX, actions=True)``.
     """
     module = sys.modules[__name__]
     registered: list[str] = []
