@@ -2,8 +2,8 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "title": "GOOSE Configuration",
-  "description": "Pick the network interfaces to listen on, save, then start. GOOSE is published to the whole segment, so every control block on that link appears; there is nothing to connect to. Optionally add the substation's SCL file (.scd/.cid) to name dataset members. Live capture needs a one-time grant on the machine running the agent; run the Check permissions action first. Decoding a pcap file needs no privileges at all.",
+  "title": "IEC 61850 Configuration",
+  "description": "GOOSE: pick the network interfaces to listen on; every control block on that link appears, there is nothing to connect to. MMS: add each IED's address and the report control blocks or values to acquire. Both land in one tree, by logical device. Optionally add the substation's SCL file (.scd/.cid) to name GOOSE dataset members. Live GOOSE capture needs a one-time grant on the machine running the agent; run the Check permissions action first. MMS and decoding a pcap file need no privileges.",
   "ui:options": {
     "autoconfig": "IEC-61850/auto_config"
   },
@@ -11,7 +11,7 @@
     "interfaces": {
       "type": "array",
       "title": "Interfaces",
-      "description": "Segments to subscribe to, in parallel. Per-frame rows appear side by side under the Prefix source, one branch per interface; control blocks are always under 'GOOSE'. Leave empty when using Replay PCAP File.",
+      "description": "Segments to subscribe to for GOOSE, in parallel. Control blocks appear by logical device, per-frame rows one branch per interface. Leave empty for MMS only or when using Replay PCAP File.",
       "items": {
         "title": "Interface",
         "type": "object",
@@ -49,6 +49,82 @@
       },
       "default": []
     },
+    "servers": {
+      "type": "array",
+      "title": "MMS Servers",
+      "description": "IEDs to read over MMS (TCP). Read-only: values arrive through the report control blocks named here and through polled reads; the only writes are to those blocks (reservation, trigger and report options, integrity period, enable). The 'Browse Server' action lists a server's blocks and data sets.",
+      "items": {
+        "title": "Server",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "host": {
+            "type": "string",
+            "title": "Host",
+            "description": "IP address or host name of the IED.",
+            "ui:placeholder": "192.168.1.10"
+          },
+          "port": {
+            "type": "integer",
+            "title": "Port",
+            "description": "MMS TCP port.",
+            "default": 102,
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Names this server in logs and status. Defaults to the host.",
+            "ui:placeholder": "defaults to the host"
+          },
+          "reports": {
+            "type": "array",
+            "title": "Report Control Blocks",
+            "description": "Blocks to reserve and enable, as the IED names them: 'LD/LLN0$RP$name01' (unbuffered) or 'LD/LLN0$BR$name01' (buffered). Each report gives one row per data object it carries at '<prefix>/<LD>/<LN>/<DO>' and one row at '<prefix>/<LD>/LLN0/RP|BR/<name>'. A block another client holds is retried until it frees.",
+            "items": {
+              "type": "string",
+              "title": "Block",
+              "ui:placeholder": "IED1LD0/LLN0$RP$urcbMeas01"
+            },
+            "default": []
+          },
+          "reads": {
+            "type": "array",
+            "title": "Polled Reads",
+            "description": "Data objects or attributes to read on an interval, for data no report covers.",
+            "items": {
+              "type": "object",
+              "title": "Read",
+              "additionalProperties": false,
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "title": "Reference",
+                  "description": "'LD/LN.DO' or 'LD/LN.DO.DA', with '[FC]' when it exists under several functional constraints.",
+                  "ui:placeholder": "IED1LD0/MMXU1.TotW[MX]"
+                },
+                "interval_s": {
+                  "type": "number",
+                  "title": "Interval",
+                  "description": "Seconds between reads.",
+                  "default": 1,
+                  "exclusiveMinimum": 0
+                }
+              },
+              "required": [
+                "ref"
+              ]
+            },
+            "default": []
+          }
+        },
+        "required": [
+          "host"
+        ]
+      },
+      "default": []
+    },
     "advanced": {
       "type": "object",
       "title": "Advanced",
@@ -62,10 +138,10 @@
         "prefix": {
           "type": "string",
           "title": "Prefix",
-          "description": "Trace source for per-frame rows, '<prefix>/<name>/goose'. Decoded control blocks are global to the station bus and always appear under 'GOOSE/<goID>', whatever the prefix.",
+          "description": "Trace source, one tree for the station: data objects at '<prefix>/<LD>/<LN>/<DO>', control blocks at '<prefix>/<LD>/LLN0/GO|RP|BR/<name>', per-frame GOOSE rows at '<prefix>/<name>/goose'.",
           "minLength": 1,
-          "default": "GOOSE",
-          "ui:placeholder": "GOOSE"
+          "default": "IEC61850",
+          "ui:placeholder": "IEC61850"
         },
         "replay_pcap": {
           "type": "string",

@@ -4,10 +4,10 @@ from collections.abc import Collection
 
 import zelos_sdk
 
-#: Default trace source (`advanced.prefix`). Per-frame rows land at
-#: `<prefix>/<name>/goose`; control blocks always sit under the fixed `GOOSE`
-#: source as `GOOSE/<goID>`, whatever the prefix.
-DEFAULT_PREFIX = "GOOSE"
+#: Default trace source (`advanced.prefix`): one tree for the station. Control
+#: blocks sit in the IEC 61850 model as `<prefix>/<LD>/LLN0/GO/<gcb>`, per-frame
+#: rows at `<prefix>/<name>/goose`.
+DEFAULT_PREFIX = "IEC61850"
 
 #: The extension's logs land at `<prefix>/log`, so no name may be `log`.
 RESERVED_NAMES = ("log",)

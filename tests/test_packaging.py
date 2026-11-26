@@ -42,7 +42,7 @@ def test_entry_module_re_exports_the_action_prefix() -> None:
     from zelos_extension_iec61850.constants import DEFAULT_PREFIX
 
     assert main.ACTION_PREFIX == ACTION_PREFIX == MANIFEST["name"] == "IEC-61850"
-    assert DEFAULT_PREFIX == "GOOSE"
+    assert DEFAULT_PREFIX == "IEC61850"
 
 
 def test_versions_agree() -> None:

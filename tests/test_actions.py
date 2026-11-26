@@ -20,9 +20,10 @@ def test_actions_register_under_their_bare_names_and_flags_are_pinned():
         name: (getattr(actions, name)._action.read_only, getattr(actions, name)._action.hidden)
         for name in registered
     }
-    # Every action is read-only: GOOSE is subscribe-only here.
+    # Every action is read-only: GOOSE is subscribe-only, MMS browse only reads.
     assert flags == {
         "auto_config": (True, True),
+        "browse": (True, False),
         "list_interfaces": (True, True),
         "check_permissions": (True, False),
         "list_gocbs": (True, False),
@@ -32,6 +33,19 @@ def test_actions_register_under_their_bare_names_and_flags_are_pinned():
     }
     assert actions.demo_capture_path()["path"] == str(DEMO_PCAP)
     assert DEMO_PCAP.is_file()
+
+
+def test_get_status_with_only_an_mms_server_runs_through_the_registry():
+    """As the agent calls it: no parameters, so the select's default must be a choice."""
+    registry = ActionsRegistry()
+    actions.register_actions(registry)
+    actions.CAPTURES.clear()
+    actions.SERVERS["ied"] = SimpleNamespace(status=lambda: {"name": "ied", "state": "connected"})
+    try:
+        result = registry.execute("get_status", {})
+    finally:
+        actions.SERVERS.clear()
+    assert result.value["servers"] == [{"name": "ied", "state": "connected"}]
 
 
 def test_list_gocbs_and_get_status_report_nothing_running():

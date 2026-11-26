@@ -138,7 +138,6 @@ class FakeDecoder:
         pdu_source=None,
         goose=False,
         scl=None,
-        goose_source=None,
     ):
         self.kwargs = {k: v for k, v in locals().items() if k != "self"}
         self.flushed = False

@@ -1,12 +1,12 @@
 name = "IEC-61850"
 version = "0.3.1"
-description = "IEC 61850 station bus: a GOOSE subscriber for every control block on a segment, decoded live or from a pcap"
+description = "IEC 61850 station bus: GOOSE from every control block on a segment, live or from a pcap, and IED data over MMS reports and reads"
 author = "Zelos"
 repository = "https://github.com/zeloscloud/zelos-extension-iec61850"
 homepage = "https://github.com/zeloscloud/zelos-extension-iec61850"
 # At most 20 keywords and 10 categories. Marketplace search matches both, the name, description,
 # author and repository. Zelos AI sees the name, description and keywords, not the categories.
-keywords = ["goose", "iec61850", "iec 61850", "substation", "scl", "scd", "protection", "pcap", "ethernet"]
+keywords = ["goose", "mms", "iec61850", "iec 61850", "substation", "ied", "scl", "scd", "protection", "pcap", "ethernet"]
 categories = ["Industrial", "Networking", "IoT"]
 icon = "assets/icon.png"
 readme = "README.md"

@@ -61,6 +61,8 @@ cli.add_command(cli_commands.check_cmd)
 cli.add_command(cli_commands.capture_cmd)
 cli.add_command(cli_commands.replay_cmd)
 cli.add_command(cli_commands.convert_cmd)
+cli.add_command(cli_commands.browse_cmd)
+cli.add_command(cli_commands.mms_cmd)
 
 
 if __name__ == "__main__":

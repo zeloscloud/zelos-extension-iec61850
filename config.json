@@ -1,7 +1,8 @@
 {
   "interfaces": [],
+  "servers": [],
   "advanced": {
-    "prefix": "GOOSE",
+    "prefix": "IEC61850",
     "log_level": "INFO"
   }
 }
