@@ -164,6 +164,31 @@ def test_reconnects_after_a_server_restart(
         restarted.stop()
 
 
+def test_a_buffered_block_resumes_after_a_dropped_link(server: MmsServer, loop) -> None:
+    """Changes made while the link is down arrive after it, in order, stamped as recorded."""
+    got, start = loop
+    config = ServerConfig("127.0.0.1", server.port, reports=[BRCB], integrity_period=0)
+    start(config, backoff=(0.5,), timeout=1)
+    assert entries(got.get(timeout=3))[0][3] == GI
+    server.model.set(f"{WATT}[MX]", 1.5)
+    assert got.get(timeout=2).entries[0].value == 1.5
+
+    server.connections[0].close()
+    down_ns = time.time_ns()
+    server.model.set(f"{WATT}[MX]", 2.5)
+    server.model.set(f"{WATT}[MX]", 3.5)
+
+    # The block stays reserved for ResvTms (5 s) after its client is gone.
+    missed = [got.get(timeout=8) for _ in range(2)]
+    assert [(r.entries[0].value, r.replayed) for r in missed] == [(2.5, True), (3.5, True)]
+    assert all(abs(r.time_ns - down_ns) < 0.4e9 < r.rx_ns - down_ns for r in missed)
+    gi = got.get(timeout=2)
+    assert (entries(gi)[0][3], gi.replayed) == (GI, False)
+    server.model.set(f"{WATT}[MX]", 4.5)
+    live = got.get(timeout=2)
+    assert (live.entries[0].value, live.replayed) == (4.5, False)
+
+
 def test_a_silent_server_is_noticed_and_reconnected(
     server: MmsServer, loop, caplog: pytest.LogCaptureFixture
 ) -> None:

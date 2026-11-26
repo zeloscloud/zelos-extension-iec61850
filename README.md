@@ -99,6 +99,7 @@ zelos extensions start zeloscloud.zelos-extension-iec61850 --config '{"servers":
 - `sqNum` and `rpt_sqnum` are the IED's counter: it wraps at 255 on an unbuffered block and at 65535 on a buffered one, and starts over when the block is enabled again
 - every block is enabled with data change, quality change, a 2 s integrity period and a general interrogation, so the first report carries every member
 - `q` and `stVal` of a double point are the bit string as an integer (position: 1 off, 2 on); `t` is ns since the epoch; the event time is the receive time
+- a buffered block resumes after a lost connection: the changes the IED buffered meanwhile arrive on reconnect, at the IED's `timeOfEntry`, followed by a general interrogation. A restart of the extension starts fresh, and an IED keeps a block reserved for a few seconds after its client is gone, which delays the reconnect by as much
 - a lost connection is retried and the blocks enabled again; a block another client holds is retried until it frees; a block or reference the server does not have stops the extension with the reason
 - two servers with the same logical device name are refused
 

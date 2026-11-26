@@ -42,6 +42,7 @@ def main() -> None:
     parser.add_argument("--period", type=float, default=0.2)
     parser.add_argument("--steps", type=int, default=0, help="0: until stopped")
     parser.add_argument("--delay", type=float, default=0.0, help="before the first step")
+    parser.add_argument("--drop-at", type=int, default=0, help="drop every client after this step")
     for kind in KINDS:
         parser.add_argument(f"--{kind}", action="append", default=[], metavar="REF[FC]")
     args = parser.parse_args()
@@ -71,6 +72,9 @@ def main() -> None:
                     record = {"step": step, "t_ns": time.time_ns(), "ref": name, "value": value}
                     log.write(json.dumps(record) + "\n")
                 log.flush()
+                if step == args.drop_at:
+                    for connection in list(server.connections):
+                        connection.close()
                 stop.wait(args.period)
             print(f"done {step}", flush=True)
             stop.wait()  # keep serving until stopped

@@ -195,11 +195,13 @@ class Tree:
                 if value is not None:
                     rows.setdefault(event, {})[field] = value
                     reasons[event] = reasons.get(event, 0) | reason
+        # A replayed report is stamped when the IED recorded it, not when it arrived.
+        at = report.time_ns if report.replayed and report.time_ns else report.rx_ns
         extra: dict[str, Any] = {"src": "report", "rcb": report.rcb}
         if report.seq_num is not None:
             extra["rpt_sqnum"] = report.seq_num
         for event, row in rows.items():
-            self.source.log_at(report.rx_ns, event, {**row, **extra, "reason": reasons[event]})
+            self.source.log_at(at, event, {**row, **extra, "reason": reasons[event]})
         block = {
             "rptID": report.rpt_id,
             "sqNum": report.seq_num,
@@ -214,7 +216,7 @@ class Tree:
             ),
         }
         self.source.log_at(
-            report.rx_ns,
+            at,
             report.rcb.replace("$", "/"),
             {k: v for k, v in block.items() if v is not None},
         )

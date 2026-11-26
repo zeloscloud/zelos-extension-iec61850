@@ -18,8 +18,8 @@ import logging
 import queue
 import threading
 import time
-from collections.abc import Callable, Iterable, Iterator, Sequence
-from dataclasses import asdict, dataclass, field
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from typing import Any, TypeVar
 
@@ -174,6 +174,7 @@ class Report:
     buf_ovfl: bool | None
     entry_id: bytes | None
     entries: tuple[ReportEntry, ...]
+    replayed: bool = False  # buffered while away, sent on resume: `time_ns` is when it happened
 
 
 @dataclass(frozen=True)
@@ -188,7 +189,7 @@ class _Block:
     def text(self) -> str:
         return f"{self.name.domain}/{self.name.item}"
 
-    def convert(self, report: _LibReport, rx_ns: int) -> Report:
+    def convert(self, report: _LibReport, rx_ns: int, replayed: bool = False) -> Report:
         entries = []
         for e in report.entries:
             # OptFlds data-reference is off: the inclusion index is the data set position.
@@ -210,6 +211,7 @@ class _Block:
             buf_ovfl=report.buf_ovfl,
             entry_id=report.entry_id,
             entries=tuple(entries),
+            replayed=replayed,
         )
 
 
@@ -223,6 +225,7 @@ class Session:
         self._model = ServerModel()  # logical devices discovered so far, for FC lookup
         # By RptID. The receive thread reads it, so a block goes in before it is enabled.
         self._blocks: dict[str, _Block] = {}
+        self._replaying: set[str] = set()  # RptIDs resumed, until their GI arrives
         self._queue: queue.Queue[Report] = queue.Queue()
         self._types: dict[Ref, tuple[Member, MmsType]] = {}
 
@@ -292,7 +295,11 @@ class Session:
         )
 
     def enable_reports(
-        self, refs: Iterable[str], *, integrity_period: float = INTEGRITY_PERIOD_S
+        self,
+        refs: Iterable[str],
+        *,
+        integrity_period: float = INTEGRITY_PERIOD_S,
+        resume: Mapping[str, bytes] | None = None,
     ) -> list[str]:
         """Reserve and enable report control blocks; their MMS references, in order.
 
@@ -300,8 +307,12 @@ class Session:
         seconds (0 for none) and general interrogation, with a GI once enabled
         so the first report carries every member. Blocks enabled before a
         failure stay enabled until `close()`.
+
+        `resume` maps a buffered block's reference to the last EntryID received
+        from it: the IED then sends what it buffered since, marked `replayed`,
+        before the GI. An IED that no longer holds that entry starts fresh.
         """
-        return [self._enable(ref, integrity_period) for ref in refs]
+        return [self._enable(ref, integrity_period, resume or {}) for ref in refs]
 
     def reports(self, stop: threading.Event | None = None) -> Iterator[Report]:
         """Reports in arrival order, on the calling thread, until `stop` is set
@@ -336,7 +347,7 @@ class Session:
 
     # --- internals --------------------------------------------------------------
 
-    def _enable(self, ref: str, integrity_period: float) -> str:
+    def _enable(self, ref: str, integrity_period: float, resume: Mapping[str, bytes]) -> str:
         found = []
         for name in _rcb_names(ref):
             status = self._call(f"reading {ref}", lambda c, n=name: _rcb.read_status(c, n))
@@ -376,11 +387,32 @@ class Session:
         settings = _rcb.RcbSettings(
             trg_ops=TRG_OPS, opt_flds=OPT_FLDS, intg_pd_ms=round(integrity_period * 1000)
         )
+        after = resume.get(text)
+
+        def enable(client: MmsClient) -> None:
+            if after:
+                self._replaying.add(rpt_id)
+                try:
+                    return _rcb.enable(client, block_name, replace(settings, entry_id=after))
+                except _rcb.RcbError as exc:
+                    self._replaying.discard(rpt_id)
+                    if exc.attribute != "EntryID":
+                        raise
+                    logger.warning(
+                        "%s: %s no longer holds entry %s; changes made while disconnected "
+                        "are not replayed.",
+                        self._where,
+                        text,
+                        after.hex(),
+                    )
+            _rcb.enable(client, block_name, settings)
+
         try:
-            self._call(f"enabling {text}", lambda c: _rcb.enable(c, block_name, settings))
+            self._call(f"enabling {text}", enable)
         except MmsError:
             # A partial reservation lapses with the association (a BRCB after ResvTms).
             del self._blocks[rpt_id]
+            self._replaying.discard(rpt_id)
             raise
         logger.info(
             "%s: enabled %s (RptID %s, %d members)", self._where, text, rpt_id, len(members)
@@ -424,7 +456,13 @@ class Session:
             if block is None:
                 logger.debug("%s: report for unknown RptID %r", self._where, report.rpt_id)
                 return
-            self._queue.put(block.convert(report, time.time_ns()))
+            replayed = report.rpt_id in self._replaying
+            if replayed and any(
+                e.reason and e.reason.general_interrogation for e in report.entries
+            ):
+                self._replaying.discard(report.rpt_id)  # the GI follows what was buffered
+                replayed = False
+            self._queue.put(block.convert(report, time.time_ns(), replayed))
         except Exception:
             logger.exception("%s: dropped a report that does not decode", self._where)
 
@@ -525,16 +563,20 @@ def run_with_reconnect(
     A lost connection (closed, a request timing out, or a block the `heartbeat`
     read-back finds disabled) is retried after the next `backoff` delay, the
     last repeating, and the blocks enabled again; the delays start over once
-    they are. A configuration error raises MmsError, as does nothing a retry
-    would fix. An exception from `on_report` ends the loop.
+    they are. A buffered block resumes after the last entry received, so what
+    the IED buffered meanwhile arrives too. A configuration error raises
+    MmsError, as does nothing a retry would fix. An exception from `on_report` ends the loop.
     """
     attempt = 0
+    last: dict[str, bytes] = {}  # buffered block -> last EntryID received
     while not stop_event.is_set():
         session = Session(config, timeout=timeout)
         error: MmsError | None = None
         try:
             session.connect()
-            session.enable_reports(config.reports, integrity_period=config.integrity_period)
+            session.enable_reports(
+                config.reports, integrity_period=config.integrity_period, resume=last
+            )
             polls = [[0.0, ref, interval] for ref, interval in config.reads]
             for _, ref, _ in polls:
                 session.member(ref)  # a bad reference fails before anything is emitted
@@ -548,6 +590,8 @@ def run_with_reconnect(
                 report = session._next(max(wait, 0.0))
                 if report is not None:
                     on_report(report)
+                    if report.entry_id and any(report.entry_id):  # all zero means none
+                        last[report.rcb] = report.entry_id
                 now = time.monotonic()
                 for poll in polls:
                     if now >= poll[0]:
