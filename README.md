@@ -83,7 +83,7 @@ keeps everything else on the station bus (Sampled Values, IP) out of the trace.
 
 ## Reading an IED over MMS
 
-Add the IED under **MMS Servers** with the report control blocks to enable; `IEC61850/browse` lists what a server has. MMS is TCP, so it needs no capture rights and runs beside GOOSE or alone.
+Add the IED under **MMS Servers** with the report control blocks to enable; `IEC-61850/browse` lists what a server has. MMS is TCP, so it needs no capture rights and runs beside GOOSE or alone.
 
 ```bash
 zelos extensions start zeloscloud.zelos-extension-iec61850 --config '{"servers": [{"host": "192.168.1.10", "reports": ["IED1LD0/LLN0$RP$urcbMeas01"]}]}'
